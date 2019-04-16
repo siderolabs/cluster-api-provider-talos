@@ -1,0 +1,10 @@
+**
+!cmd
+!hack
+!images/*.tar
+!internal
+!pkg
+!vendor
+!web
+!go.mod
+!go.sum

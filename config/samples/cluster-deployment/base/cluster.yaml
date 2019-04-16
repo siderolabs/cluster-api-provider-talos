@@ -1,0 +1,19 @@
+apiVersion: "cluster.k8s.io/v1alpha1"
+kind: Cluster
+metadata:
+  name: talos-test-cluster
+  annotations:
+spec:
+  clusterNetwork:
+      services:
+          cidrBlocks: ["10.96.0.0/12"]
+      pods: 
+          cidrBlocks: ["192.168.0.0/16"]
+      serviceDomain: "cluster.local"
+  providerSpec:
+    value:
+      apiVersion: "talosproviderconfig/v1alpha1"
+      kind: "TalosClusterProviderSpec"
+      masters:
+        ips: []
+      workers: {}

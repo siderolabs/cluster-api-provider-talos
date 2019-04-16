@@ -1,0 +1,24 @@
+apiVersion: "cluster.k8s.io/v1alpha1"
+kind: MachineSet
+metadata:
+  name: talos-test-cluster-workers
+  labels:
+    cluster.k8s.io/cluster-name: talos-test-cluster
+    set: worker
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      cluster.k8s.io/cluster-name: talos-test-cluster
+      set: worker
+  template:
+    metadata:
+      labels:
+        cluster.k8s.io/cluster-name: talos-test-cluster
+        set: worker
+    spec:
+      providerSpec:
+        value:
+          apiVersion: "talosproviderconfig/v1alpha1"
+          kind: "TalosMachineProviderSpec"
+          platform: {}

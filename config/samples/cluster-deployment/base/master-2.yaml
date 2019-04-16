@@ -1,0 +1,13 @@
+apiVersion: "cluster.k8s.io/v1alpha1"
+kind: Machine
+metadata:
+  name: talos-test-cluster-master-2
+  labels:
+    cluster.k8s.io/cluster-name: talos-test-cluster
+    set: master
+spec:
+  providerSpec:
+    value:
+      apiVersion: "talosproviderconfig/v1alpha1"
+      kind: "TalosMachineProviderSpec"
+      platform: {}

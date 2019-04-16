@@ -1,0 +1,12 @@
+- op: replace
+  path: /spec/providerSpec/value/platform
+  value:
+    type: "gce"
+    config: |
+      zone: "us-central1-c"
+      project: "testbed-1160"
+      instances:
+        type:  "n1-standard-1"
+        image: "https://www.googleapis.com/compute/v1/projects/testbed-1160/global/images/talos"
+        disks:
+          size: 10
