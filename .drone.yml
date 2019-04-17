@@ -1,0 +1,51 @@
+---
+kind: pipeline
+name: default
+
+workspace:
+  base: /go
+  path: src/github.com/talos-systems/cluster-api-provider-talos
+
+steps:
+  - name: test
+    image: golang:latest
+    commands:
+      - go get github.com/golang/dep/cmd/dep
+      - dep ensure -v
+      - make test-prep
+      - make test
+    environment:
+      GOPATH: /go
+      GOBIN: /go/bin
+      IMG: autonomy/cluster-api-provider-talos:latest
+
+  - name: docker-build-dry-run
+    image: plugins/docker
+    settings:
+      repo: autonomy/cluster-api-provider-talos
+      dry_run: true
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+    when:
+      event:
+        include:
+          - pull_request
+
+  - name: docker-build-push
+    image: plugins/docker
+    settings:
+      repo: autonomy/cluster-api-provider-talos
+      auto_tag: true
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+    when:
+      branch:
+        include:
+          - master
+      event:
+        exclude:
+          - pull_request
