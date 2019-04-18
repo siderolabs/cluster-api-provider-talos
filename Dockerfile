@@ -11,7 +11,7 @@ COPY vendor/ vendor/
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager github.com/talos-systems/cluster-api-provider-talos/cmd/manager
 
 # Copy the controller-manager into a thin image
-FROM ubuntu:latest
+FROM scratch
 WORKDIR /
 COPY --from=builder /go/src/github.com/talos-systems/cluster-api-provider-talos/manager .
 ENTRYPOINT ["/manager"]

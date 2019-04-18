@@ -1,11 +1,18 @@
 
 # Image URL to use all building/pushing image targets
 IMG ?= autonomy/cluster-api-provider-talos:latest
-
+KUBEBUILDER_VER ?= 1.0.8
 all: test manager
 
+test-prep:
+	wget https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${KUBEBUILDER_VER}/kubebuilder_${KUBEBUILDER_VER}_linux_amd64.tar.gz
+	tar -xvf kubebuilder_${KUBEBUILDER_VER}_linux_amd64.tar.gz
+	mv kubebuilder_${KUBEBUILDER_VER}_linux_amd64 kubebuilder
+	mv kubebuilder /usr/local
+
+
 # Run tests
-test: generate fmt vet manifests
+test: generate fmt vet
 	go test ./pkg/... ./cmd/... -coverprofile cover.out
 
 # Build manager binary
@@ -48,10 +55,11 @@ endif
 	go generate ./pkg/... ./cmd/...
 
 # Build the docker image
-docker-build: test
+docker-build:
 	docker build . -t ${IMG}
-	@echo "updating kustomize image patch file for manager resource"
-	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
+	
+	# @echo "updating kustomize image patch file for manager resource"
+	# sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
 
 # Push the docker image
 docker-push:
