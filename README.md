@@ -3,6 +3,6 @@
 A [cluster-api](https://github.com/kubernetes-sigs/cluster-api) provider for deploying [Talos](https://github.com/talos-systems/talos) clusters.
 
 
-#### Supported platforms
+#### Getting Started Guides:
 
 - [GCE](docs/GCE.md)
