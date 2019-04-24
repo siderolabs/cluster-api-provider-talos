@@ -2,5 +2,3 @@
   path: /spec/providerSpec/value/masters/ips
   value:
     - x.x.x.x
-    - y.y.y.y
-    - z.z.z.z
