@@ -301,13 +301,13 @@ func deleteConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Clientse
 	for index := range spec.Masters.IPs {
 		cmName := cluster.ObjectMeta.Name + "-master-" + strconv.Itoa(index)
 		err = clientset.CoreV1().ConfigMaps("cluster-api-provider-talos-system").Delete(cmName, nil)
-		if err != nil {
+		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 	}
 
 	err = clientset.CoreV1().ConfigMaps("cluster-api-provider-talos-system").Delete(cluster.ObjectMeta.Name+"-workers", nil)
-	if err != nil {
+	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
