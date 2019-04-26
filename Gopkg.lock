@@ -413,12 +413,15 @@
   version = "v1.0.3"
 
 [[projects]]
-  branch = "master"
-  digest = "1:adb2070a0379a2362cb8701a5fb8d54b4e745718051aa1e604c9aff84fe1934a"
+  digest = "1:6483012b84a9778e8cd74855e090aab7a56eadb9de2c06c2339c684368289162"
   name = "github.com/talos-systems/talos"
-  packages = ["pkg/crypto/x509"]
+  packages = [
+    "pkg/crypto/x509",
+    "pkg/userdata/generate",
+  ]
   pruneopts = "T"
-  revision = "1b0b3ae59c253bc34d577b9d8431dd7d98f3df37"
+  revision = "3585ab2ad0b239876d893a981905f3e43503ef29"
+  version = "v0.1.0-alpha.24"
 
 [[projects]]
   digest = "1:32a5dad5ad78e69220779ed344fc656c88227255e12770fc09e86eeb5ac2364e"
@@ -1055,7 +1058,7 @@
     "github.com/emicklei/go-restful",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
-    "github.com/talos-systems/talos/pkg/crypto/x509",
+    "github.com/talos-systems/talos/pkg/userdata/generate",
     "golang.org/x/net/context",
     "google.golang.org/api/compute/v1",
     "google.golang.org/api/option",

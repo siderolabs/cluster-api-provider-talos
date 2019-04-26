@@ -17,17 +17,10 @@ limitations under the License.
 package cluster
 
 import (
-	stdlibx509 "crypto/x509"
-	"encoding/base64"
-	"encoding/pem"
-	goerrors "errors"
-	"net"
 	"strconv"
-	"strings"
 
-	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/userdata"
 	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/utils"
-	"github.com/talos-systems/talos/pkg/crypto/x509"
+	"github.com/talos-systems/talos/pkg/userdata/generate"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,13 +29,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
+const (
+	ClusterAPIProviderTalosNamespace = "cluster-api-provider-talos-system"
+)
+
 // ClusterActuator is responsible for performing machine reconciliation
-type ClusterActuator struct {
-}
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+type ClusterActuator struct{}
 
 // ClusterActuatorParams holds parameter information for Actuator
-type ClusterActuatorParams struct {
-}
+type ClusterActuatorParams struct{}
 
 // NewClusterActuator creates a new Actuator
 func NewClusterActuator(mgr manager.Manager, params ClusterActuatorParams) (*ClusterActuator, error) {
@@ -52,31 +48,28 @@ func NewClusterActuator(mgr manager.Manager, params ClusterActuatorParams) (*Clu
 // Reconcile reconciles a cluster and is invoked by the Cluster Controller
 // TODO: This needs to be idempotent. Check if these certs and stuff already exist
 func (a *ClusterActuator) Reconcile(cluster *clusterv1.Cluster) error {
-
 	// creates the clientset
-	//It feels like I may want a global k8s client set. We use it everywhere in both actuators
+	// It feels like I may want a global k8s client set. We use it everywhere in both actuators
 	clientset, err := utils.CreateK8sClientSet()
 	if err != nil {
 		return err
 	}
 
-	//Gen tokens for kubeadm
-	kubeadmTokens := &userdata.KubeadmTokens{
-		BootstrapToken: utils.RandomString(6) + "." + utils.RandomString(16),
-		CertKey:        utils.RandomString(26),
-	}
-
-	//Gen user/pass for trustd
-	trustdInfo := &userdata.TrustdInfo{
-		Username: utils.RandomString(14),
-		Password: utils.RandomString(24),
-	}
-
-	err = createMasterConfigMaps(cluster, clientset, kubeadmTokens, trustdInfo)
+	spec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
 	if err != nil {
 		return err
 	}
-	err = createWorkerConfigMaps(cluster, clientset, kubeadmTokens, trustdInfo)
+
+	input, err := generate.NewInput(cluster.ObjectMeta.Name, spec.Masters.IPs)
+	if err != nil {
+		return err
+	}
+
+	err = createMasterConfigMaps(cluster, clientset, input)
+	if err != nil {
+		return err
+	}
+	err = createWorkerConfigMaps(cluster, clientset, input)
 	if err != nil {
 		return err
 	}
@@ -85,7 +78,6 @@ func (a *ClusterActuator) Reconcile(cluster *clusterv1.Cluster) error {
 
 // Delete deletes a cluster and is invoked by the Cluster Controller
 func (a *ClusterActuator) Delete(cluster *clusterv1.Cluster) error {
-
 	clientset, err := utils.CreateK8sClientSet()
 	if err != nil {
 		return err
@@ -99,214 +91,89 @@ func (a *ClusterActuator) Delete(cluster *clusterv1.Cluster) error {
 	return nil
 }
 
-//createMasterConfigMaps generates certs and creates configmaps that define the userdata for each node
-func createMasterConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset, kubeadmTokens *userdata.KubeadmTokens, trustdInfo *userdata.TrustdInfo) error {
-
-	spec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
+// createMasterConfigMaps generates certs and creates configmaps that define the userdata for each node
+func createMasterConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset, input *generate.Input) error {
+	talosconfig, err := generate.Talosconfig(input)
 	if err != nil {
 		return err
 	}
 
-	//Gen k8s certs
-	opts := []x509.Option{x509.RSA(true), x509.Organization("talos-k8s")}
-	k8sCert, err := x509.NewSelfSignedCertificateAuthority(opts...)
+	initData, err := generate.Userdata(generate.TypeInit, input)
 	if err != nil {
 		return err
 	}
 
-	//Gen os certs
-	opts = []x509.Option{x509.RSA(false), x509.Organization("talos-os")}
-	osCert, err := x509.NewSelfSignedCertificateAuthority(opts...)
+	controlPlaneData, err := generate.Userdata(generate.TypeControlPlane, input)
 	if err != nil {
 		return err
 	}
 
-	//Gen admin certs
-	adminKey, err := x509.NewKey()
-	if err != nil {
-		return err
-	}
-	pemBlock, _ := pem.Decode(adminKey.KeyPEM)
-	if pemBlock == nil {
-		return goerrors.New("Unable to decode admin key pem")
-	}
-	adminKeyEC, err := stdlibx509.ParseECPrivateKey(pemBlock.Bytes)
-	if err != nil {
-		return err
-	}
-	ips := []net.IP{net.ParseIP("127.0.0.1")}
-	opts = []x509.Option{x509.IPAddresses(ips)}
-	csr, err := x509.NewCertificateSigningRequest(adminKeyEC, opts...)
-	if err != nil {
-		return err
-	}
-	csrPemBlock, _ := pem.Decode(csr.X509CertificateRequestPEM)
-	if csrPemBlock == nil {
-		return goerrors.New("Unable to decode csr pem")
-	}
-	ccsr, err := stdlibx509.ParseCertificateRequest(csrPemBlock.Bytes)
-	caPemBlock, _ := pem.Decode(osCert.CrtPEM)
-	if caPemBlock == nil {
-		return goerrors.New("Unable to decode ca cert pem")
-	}
-	caCrt, err := stdlibx509.ParseCertificate(caPemBlock.Bytes)
-	caKeyPemBlock, _ := pem.Decode(osCert.KeyPEM)
-	if caKeyPemBlock == nil {
-		return goerrors.New("Unable to decode ca key pem")
-	}
-	caKey, err := stdlibx509.ParseECPrivateKey(caKeyPemBlock.Bytes)
-	adminCrt, err := x509.NewCertificateFromCSR(caCrt, caKey, ccsr)
-	if err != nil {
-		return err
-	}
+	allData := []string{initData, controlPlaneData, controlPlaneData}
 
-	//Gather up all them there certs
-	certs := &userdata.Certs{
-		AdminCert: base64.StdEncoding.EncodeToString(adminCrt.X509CertificatePEM),
-		AdminKey:  base64.StdEncoding.EncodeToString(adminKey.KeyPEM),
-		OsCert:    base64.StdEncoding.EncodeToString(osCert.CrtPEM),
-		OsKey:     base64.StdEncoding.EncodeToString(osCert.KeyPEM),
-		K8sCert:   base64.StdEncoding.EncodeToString(k8sCert.CrtPEM),
-		K8sKey:    base64.StdEncoding.EncodeToString(k8sCert.KeyPEM),
-	}
+	for index, userdata := range allData {
+		name := cluster.ObjectMeta.Name + "-master-" + strconv.Itoa(index)
+		data := map[string]string{"userdata": userdata, "talosconfig": talosconfig}
 
-	//For each master, gen userdata and push it into a configmap
-	for index := range spec.Masters.IPs {
-		cmName := cluster.ObjectMeta.Name + "-master-" + strconv.Itoa(index)
-
-		//Check if cm exists
-		cmExists := true
-		_, err = clientset.CoreV1().ConfigMaps("cluster-api-provider-talos-system").Get(cmName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			cmExists = false
-		}
-
-		udType := "controlplane"
-		if index == 0 {
-			udType = "init"
-		}
-		udInput := &userdata.Input{
-			UserdataType:  udType,
-			Certs:         certs,
-			MasterIPs:     spec.Masters.IPs,
-			Index:         index,
-			ClusterName:   cluster.ObjectMeta.Name,
-			ServiceDomain: cluster.Spec.ClusterNetwork.ServiceDomain,
-			PodNet:        cluster.Spec.ClusterNetwork.Pods.CIDRBlocks,
-			ServiceNet:    cluster.Spec.ClusterNetwork.Services.CIDRBlocks,
-			Endpoints:     strings.Join(spec.Masters.IPs[1:], ", "),
-			KubeadmTokens: kubeadmTokens,
-			TrustdInfo:    trustdInfo,
-		}
-
-		ud, err := userdata.GenUdata(udInput)
-		if err != nil {
+		if err := createConfigMap(clientset, name, data); err != nil {
 			return err
 		}
-
-		adminConf, err := userdata.GenAdmin(udInput)
-		if err != nil {
-			return err
-		}
-
-		cm := &v1.ConfigMap{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "ConfigMap",
-				APIVersion: "v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      cmName,
-				Namespace: "cluster-api-provider-talos-system",
-			},
-			Data:       map[string]string{"userdata": ud, "admin.conf": adminConf},
-			BinaryData: nil,
-		}
-
-		if cmExists {
-			_, err = clientset.CoreV1().ConfigMaps("cluster-api-provider-talos-system").Update(cm)
-		} else {
-			_, err = clientset.CoreV1().ConfigMaps("cluster-api-provider-talos-system").Create(cm)
-
-		}
-		if err != nil {
-			return err
-		}
-
 	}
+
 	return nil
 }
 
-//createWorkerConfigMaps creates a configmap for a machineset of workers
-func createWorkerConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset, kubeadmTokens *userdata.KubeadmTokens, trustdInfo *userdata.TrustdInfo) error {
-
-	spec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
+// createWorkerConfigMaps creates a configmap for a machineset of workers
+func createWorkerConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset, input *generate.Input) error {
+	workerData, err := generate.Userdata(generate.TypeJoin, input)
 	if err != nil {
 		return err
 	}
 
-	cmName := cluster.ObjectMeta.Name + "-workers"
+	name := cluster.ObjectMeta.Name + "-workers"
+	data := map[string]string{"userdata": workerData}
 
-	//Check if cm exists
-	cmExists := true
-	_, err = clientset.CoreV1().ConfigMaps("cluster-api-provider-talos-system").Get(cmName, metav1.GetOptions{})
-	if errors.IsNotFound(err) {
-		cmExists = false
-	}
+	return createConfigMap(clientset, name, data)
+}
 
-	udInput := &userdata.Input{
-		UserdataType:  "worker",
-		MasterIPs:     spec.Masters.IPs,
-		KubeadmTokens: kubeadmTokens,
-		TrustdInfo:    trustdInfo,
-	}
-
-	ud, err := userdata.GenUdata(udInput)
-	if err != nil {
-		return err
-	}
-
+func createConfigMap(clientset *kubernetes.Clientset, name string, data map[string]string) error {
 	cm := &v1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cmName,
-			Namespace: "cluster-api-provider-talos-system",
+			Name:      name,
+			Namespace: ClusterAPIProviderTalosNamespace,
 		},
-		Data:       map[string]string{"userdata": ud},
-		BinaryData: nil,
+		Data: data,
 	}
 
-	if cmExists {
-		_, err = clientset.CoreV1().ConfigMaps("cluster-api-provider-talos-system").Update(cm)
-	} else {
-		_, err = clientset.CoreV1().ConfigMaps("cluster-api-provider-talos-system").Create(cm)
-
-	}
-	if err != nil {
-		return err
+	_, err := clientset.CoreV1().ConfigMaps(ClusterAPIProviderTalosNamespace).Create(cm)
+	if errors.IsAlreadyExists(err) {
+		_, err = clientset.CoreV1().ConfigMaps(ClusterAPIProviderTalosNamespace).Update(cm)
 	}
 
-	return nil
+	return err
 }
 
-//deleteConfigMaps cleans up all configmaps associated with this cluster
+// deleteConfigMaps cleans up all configmaps associated with this cluster
 func deleteConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset) error {
+	// TODO(andrewrynhard): We should add labels to the ConfigMaps and use
+	// the lables to find the ConfigMaps.
 	spec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
 	if err != nil {
 		return err
 	}
 
 	for index := range spec.Masters.IPs {
-		cmName := cluster.ObjectMeta.Name + "-master-" + strconv.Itoa(index)
-		err = clientset.CoreV1().ConfigMaps("cluster-api-provider-talos-system").Delete(cmName, nil)
+		name := cluster.ObjectMeta.Name + "-master-" + strconv.Itoa(index)
+		err = clientset.CoreV1().ConfigMaps(ClusterAPIProviderTalosNamespace).Delete(name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 	}
 
-	err = clientset.CoreV1().ConfigMaps("cluster-api-provider-talos-system").Delete(cluster.ObjectMeta.Name+"-workers", nil)
+	err = clientset.CoreV1().ConfigMaps(ClusterAPIProviderTalosNamespace).Delete(cluster.ObjectMeta.Name+"-workers", nil)
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
