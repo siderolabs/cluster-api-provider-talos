@@ -79,8 +79,6 @@ spec:
           mountPath: /etc/credentials
         - name: certs
           mountPath: /etc/ssl/certs
-        - name: machine-setup
-          mountPath: /etc/machinesetup
       terminationGracePeriodSeconds: 10
       volumes:
       - name: cert
@@ -93,9 +91,6 @@ spec:
       - name: certs
         hostPath:
           path: /etc/ssl/certs
-      - name: machine-setup
-        configMap:
-          name: machine-setup
 ---
 apiVersion: v1
 kind: Secret
