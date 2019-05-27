@@ -34,8 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
 
-var provisioners = []string{"gce"}
-
 func main() {
 	cfg := config.GetConfigOrDie()
 	if cfg == nil {
@@ -58,15 +56,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	//Create machine actuator for each provisioner type
-	var machineActuators []*machine.MachineActuator
-	for _, provisioner := range provisioners {
-		newActuator, err := machine.NewMachineActuator(machine.MachineActuatorParams{Provisioner: provisioner})
-		if err != nil {
-			panic(err)
-		}
-		machineActuators = append(machineActuators, newActuator)
+	machineActuator, err := machine.NewMachineActuator(machine.MachineActuatorParams{})
+	if err != nil {
+		panic(err)
 	}
 
 	// Register our cluster deployer (the interface is in clusterctl and we define the Deployer interface on the actuator)
@@ -80,11 +72,7 @@ func main() {
 		panic(err)
 	}
 
-	//Add all machine actuators
-	for _, actuator := range machineActuators {
-		capimachine.AddWithActuator(mgr, actuator)
-	}
-
+	capimachine.AddWithActuator(mgr, machineActuator)
 	capicluster.AddWithActuator(mgr, clusterActuator)
 
 	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {

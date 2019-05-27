@@ -12,7 +12,7 @@ import (
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/option"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	clusterv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
@@ -48,6 +48,7 @@ func NewGCE() (*GCE, error) {
 
 // Create creates an instance in GCE.
 func (gce *GCE) Create(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
+
 	clusterSpec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
 	if err != nil {
 		return err
@@ -71,12 +72,12 @@ func (gce *GCE) Create(cluster *clusterv1.Cluster, machine *clusterv1.Machine, c
 	natIP := ""
 	if strings.Contains(machine.ObjectMeta.Name, "worker") {
 		udConfigMap, err = clientset.CoreV1().ConfigMaps("cluster-api-provider-talos-system").Get(cluster.ObjectMeta.Name+"-workers", metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			return err
 		}
 	} else {
 		udConfigMap, err = clientset.CoreV1().ConfigMaps("cluster-api-provider-talos-system").Get(machine.ObjectMeta.Name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			return err
 		}
 		nameSlice := strings.Split(machine.ObjectMeta.Name, "-")
@@ -134,22 +135,15 @@ func (gce *GCE) Update(cluster *clusterv1.Cluster, machine *clusterv1.Machine, c
 }
 
 // Delete deletes a GCE instance.
-func (gce *GCE) Delete(machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
+func (gce *GCE) Delete(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
 
 	machineSpec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
 	if err != nil {
 		return err
 	}
+
 	gceConfig := &ClusterInfo{}
 	yaml.Unmarshal([]byte(machineSpec.Platform.Config), gceConfig)
-
-	exists, err := gce.Exists(machine, clientset)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return nil
-	}
 
 	computeService, err := client(clientset)
 	if err != nil {
@@ -164,11 +158,12 @@ func (gce *GCE) Delete(machine *clusterv1.Machine, clientset *kubernetes.Clients
 }
 
 // Exists returns whether or not an instance is present in GCE.
-func (gce *GCE) Exists(machine *clusterv1.Machine, clientset *kubernetes.Clientset) (bool, error) {
+func (gce *GCE) Exists(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) (bool, error) {
 	machineSpec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
 	if err != nil {
 		return false, err
 	}
+
 	gceConfig := &ClusterInfo{}
 	yaml.Unmarshal([]byte(machineSpec.Platform.Config), gceConfig)
 
@@ -178,8 +173,10 @@ func (gce *GCE) Exists(machine *clusterv1.Machine, clientset *kubernetes.Clients
 	}
 
 	_, err = computeService.Instances.Get(gceConfig.Project, gceConfig.Zone, machine.ObjectMeta.Name).Do()
-	if err != nil {
+	if err != nil && strings.Contains(err.Error(), "notFound") {
 		return false, nil
+	} else if err != nil {
+		return false, err
 	}
 
 	return true, nil
@@ -187,7 +184,7 @@ func (gce *GCE) Exists(machine *clusterv1.Machine, clientset *kubernetes.Clients
 
 func client(clientset *kubernetes.Clientset) (*compute.Service, error) {
 	creds, err := clientset.CoreV1().Secrets("cluster-api-provider-talos-system").Get("machine-controller-credential", metav1.GetOptions{})
-	if errors.IsNotFound(err) {
+	if k8serrors.IsNotFound(err) {
 		return nil, err
 	}
 
