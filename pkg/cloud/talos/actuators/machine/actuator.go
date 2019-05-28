@@ -37,35 +37,34 @@ const (
 
 // MachineActuator is responsible for performing machine reconciliation
 type MachineActuator struct {
-	Provisioner provisioners.Provisioner
-	Clientset   *kubernetes.Clientset
+	Clientset *kubernetes.Clientset
 }
 
 // MachineActuatorParams holds parameter information for Actuator
 type MachineActuatorParams struct {
-	Provisioner string
 }
 
 // NewMachineActuator creates a new Actuator
 func NewMachineActuator(params MachineActuatorParams) (*MachineActuator, error) {
-	provisioner, err := provisioners.NewProvisioner(params.Provisioner)
-	if err != nil {
-		return nil, err
-	}
 
 	clientset, err := utils.CreateK8sClientSet()
 	if err != nil {
 		return nil, err
 	}
 
-	return &MachineActuator{Provisioner: provisioner, Clientset: clientset}, nil
+	return &MachineActuator{Clientset: clientset}, nil
 }
 
 // Create creates a machine and is invoked by the Machine Controller
 func (a *MachineActuator) Create(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine) error {
 	log.Printf("Creating machine %v for cluster %v.", machine.Name, cluster.Name)
 
-	err := a.Provisioner.Create(cluster, machine, a.Clientset)
+	provisioner, err := createProvisioner(machine)
+	if err != nil {
+		return err
+	}
+
+	err = provisioner.Create(cluster, machine, a.Clientset)
 	if err != nil {
 		return err
 	}
@@ -75,9 +74,14 @@ func (a *MachineActuator) Create(ctx context.Context, cluster *clusterv1.Cluster
 
 // Delete deletes a machine and is invoked by the Machine Controller
 func (a *MachineActuator) Delete(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine) error {
-	log.Printf("Creating machine %v for cluster %v.", machine.Name, cluster.Name)
+	log.Printf("Deleting machine %v for cluster %v.", machine.Name, cluster.Name)
 
-	err := a.Provisioner.Delete(machine, a.Clientset)
+	provisioner, err := createProvisioner(machine)
+	if err != nil {
+		return err
+	}
+
+	err = provisioner.Delete(cluster, machine, a.Clientset)
 	if err != nil {
 		return err
 	}
@@ -89,7 +93,12 @@ func (a *MachineActuator) Delete(ctx context.Context, cluster *clusterv1.Cluster
 func (a *MachineActuator) Update(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine) error {
 	log.Printf("Updating machine %v for cluster %v.", machine.Name, cluster.Name)
 
-	err := a.Provisioner.Update(cluster, machine, a.Clientset)
+	provisioner, err := createProvisioner(machine)
+	if err != nil {
+		return err
+	}
+
+	err = provisioner.Update(cluster, machine, a.Clientset)
 	if err != nil {
 		return err
 	}
@@ -100,11 +109,30 @@ func (a *MachineActuator) Update(ctx context.Context, cluster *clusterv1.Cluster
 // Exists tests for the existence of a machine and is invoked by the Machine Controller
 func (a *MachineActuator) Exists(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine) (bool, error) {
 	log.Printf("Checking if machine %v for cluster %v exists.", machine.Name, cluster.Name)
+	provisioner, err := createProvisioner(machine)
+	if err != nil {
+		return true, err
+	}
 
-	exists, err := a.Provisioner.Exists(machine, a.Clientset)
+	exists, err := provisioner.Exists(cluster, machine, a.Clientset)
 	if err != nil {
 		return true, err
 	}
 
 	return exists, nil
+}
+
+func createProvisioner(machine *clusterv1.Machine) (provisioners.Provisioner, error) {
+
+	machineSpec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	provisioner, err := provisioners.NewProvisioner(machineSpec.Platform.Type)
+	if err != nil {
+		return nil, err
+	}
+
+	return provisioner, nil
 }

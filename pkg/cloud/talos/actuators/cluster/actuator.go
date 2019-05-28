@@ -135,6 +135,7 @@ func createWorkerConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Cl
 	return createConfigMap(clientset, name, data)
 }
 
+// createConfigMap creates a config map in kubernetes with given data
 func createConfigMap(clientset *kubernetes.Clientset, name string, data map[string]string) error {
 	cm := &v1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{

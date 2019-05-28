@@ -1,0 +1,12 @@
+- op: replace
+  path: /spec/template/spec/providerSpec/value/platform
+  value:
+    config: |-
+      region: "us-west-2"
+      instances:
+        type:  "t2.micro"
+        ami: "{{AWS_AMI}}"
+        keypair: "{{AWS_KEY_NAME}}"
+        disks:
+          size: 10
+    type: aws

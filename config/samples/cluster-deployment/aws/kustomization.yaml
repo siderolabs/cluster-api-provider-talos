@@ -1,0 +1,41 @@
+bases:
+  - ../base/
+
+patchesJson6902:
+  ##Add master static IPs to cluster.yaml
+  - target:
+      group: cluster.k8s.io
+      version: v1alpha1
+      kind: Cluster
+      name: talos-test-cluster
+    path: master-ips.yaml
+
+  ##Patch each master with gce config
+  - target:
+      group: cluster.k8s.io
+      version: v1alpha1
+      kind: Machine
+      name: talos-test-cluster-master-0
+    path: platform-config-masters.yaml
+
+  # Uncomment for HA masters
+  # - target:
+  #     group: cluster.k8s.io
+  #     version: v1alpha1
+  #     kind: Machine
+  #     name: talos-test-cluster-master-1
+  #   path: platform-config-masters.yaml
+  # - target:
+  #     group: cluster.k8s.io
+  #     version: v1alpha1
+  #     kind: Machine
+  #     name: talos-test-cluster-master-2
+  #   path: platform-config-masters.yaml
+
+  ##Patch workers with gce config
+  - target:
+      group: cluster.k8s.io
+      version: v1alpha1
+      kind: MachineDeployment
+      name: talos-test-cluster-workers
+    path: platform-config-workers.yaml
