@@ -24,6 +24,8 @@ import (
 	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/utils"
 	"k8s.io/client-go/kubernetes"
 	clusterv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 const (
@@ -37,22 +39,22 @@ const (
 
 // MachineActuator is responsible for performing machine reconciliation
 type MachineActuator struct {
-	Clientset *kubernetes.Clientset
+	Clientset        *kubernetes.Clientset
+	controllerClient client.Client
 }
 
 // MachineActuatorParams holds parameter information for Actuator
-type MachineActuatorParams struct {
-}
+type MachineActuatorParams struct{}
 
 // NewMachineActuator creates a new Actuator
-func NewMachineActuator(params MachineActuatorParams) (*MachineActuator, error) {
+func NewMachineActuator(mgr manager.Manager, params MachineActuatorParams) (*MachineActuator, error) {
 
 	clientset, err := utils.CreateK8sClientSet()
 	if err != nil {
 		return nil, err
 	}
 
-	return &MachineActuator{Clientset: clientset}, nil
+	return &MachineActuator{Clientset: clientset, controllerClient: mgr.GetClient()}, nil
 }
 
 // Create creates a machine and is invoked by the Machine Controller

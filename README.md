@@ -5,4 +5,5 @@ A [cluster-api](https://github.com/kubernetes-sigs/cluster-api) provider for dep
 
 #### Getting Started Guides:
 
+- [AWS](docs/AWS.md)
 - [GCE](docs/GCE.md)
