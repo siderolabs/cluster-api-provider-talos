@@ -5,6 +5,7 @@ import (
 
 	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/provisioners/aws"
 	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/provisioners/gce"
+	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/provisioners/packet"
 	"k8s.io/client-go/kubernetes"
 	clusterv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
 )
@@ -23,6 +24,8 @@ func NewProvisioner(id string) (Provisioner, error) {
 		return gce.NewGCE()
 	case "aws":
 		return aws.NewAWS()
+	case "packet":
+		return packet.NewPacket()
 	}
 	return nil, errors.New("Unknown provisioner")
 }
