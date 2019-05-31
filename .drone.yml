@@ -6,7 +6,24 @@ workspace:
   base: /go
   path: src/github.com/talos-systems/cluster-api-provider-talos
 
+services:
+- name: docker
+  image: docker:dind
+  privileged: true
+  volumes:
+  - name: dockersock
+    path: /var/run
+  - name: tmp
+    path: /tmp
+
 steps:
+  - name: fetch
+    image: docker:git
+    commands:
+    - git fetch --tags
+    when:
+      event: tag
+
   - name: test
     image: golang:latest
     commands:
@@ -18,34 +35,39 @@ steps:
       GOPATH: /go
       GOBIN: /go/bin
       IMG: autonomy/cluster-api-provider-talos:latest
+    depends_on:
+    - fetch
 
-  - name: docker-build-dry-run
-    image: plugins/docker
-    settings:
-      repo: autonomy/cluster-api-provider-talos
-      dry_run: true
-      username:
-        from_secret: docker_username
-      password:
-        from_secret: docker_password
-    when:
-      event:
-        include:
-          - pull_request
+  - name: build
+    image: autonomy/build-container:latest
+    pull: always
+    commands:
+      - make docker-build
+    volumes:
+    - name: dockersock
+      path: /var/run
+    depends_on:
+    - test
 
-  - name: docker-build-push
-    image: plugins/docker
-    settings:
-      repo: autonomy/cluster-api-provider-talos
-      auto_tag: true
-      username:
+  - name: push
+    image: autonomy/build-container:latest
+    pull: always
+    environment:
+      DOCKER_USERNAME:
         from_secret: docker_username
-      password:
+      DOCKER_PASSWORD:
         from_secret: docker_password
+    commands:
+    - make login
+    - make docker-push
+    volumes:
+    - name: dockersock
+      path: /var/run
     when:
-      branch:
-        include:
-          - master
       event:
         exclude:
-          - pull_request
+        - pull_request
+
+volumes:
+- name: dockersock
+  temp: {}
