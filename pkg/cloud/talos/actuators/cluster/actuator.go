@@ -17,15 +17,18 @@ limitations under the License.
 package cluster
 
 import (
+	"context"
+	"errors"
 	"strconv"
 
 	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/utils"
 	"github.com/talos-systems/talos/pkg/userdata/generate"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	clusterv1 "sigs.k8s.io/cluster-api/pkg/apis/cluster/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
@@ -35,25 +38,30 @@ const (
 
 // ClusterActuator is responsible for performing machine reconciliation
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
-type ClusterActuator struct{}
+// Add RBAC rules to access cluster-api resources
+//+kubebuilder:rbac:groups=cluster.k8s.io,resources=clusters;clusters/status,verbs=get;list;watch
+type ClusterActuator struct {
+	Clientset        *kubernetes.Clientset
+	controllerClient client.Client
+}
 
 // ClusterActuatorParams holds parameter information for Actuator
-type ClusterActuatorParams struct{}
+type ClusterActuatorParams struct {
+}
 
 // NewClusterActuator creates a new Actuator
 func NewClusterActuator(mgr manager.Manager, params ClusterActuatorParams) (*ClusterActuator, error) {
-	return &ClusterActuator{}, nil
+	clientset, err := utils.CreateK8sClientSet()
+	if err != nil {
+		return nil, err
+	}
+
+	return &ClusterActuator{Clientset: clientset, controllerClient: mgr.GetClient()}, nil
 }
 
 // Reconcile reconciles a cluster and is invoked by the Cluster Controller
 // TODO: This needs to be idempotent. Check if these certs and stuff already exist
 func (a *ClusterActuator) Reconcile(cluster *clusterv1.Cluster) error {
-	// creates the clientset
-	// It feels like I may want a global k8s client set. We use it everywhere in both actuators
-	clientset, err := utils.CreateK8sClientSet()
-	if err != nil {
-		return err
-	}
 
 	spec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
 	if err != nil {
@@ -65,11 +73,11 @@ func (a *ClusterActuator) Reconcile(cluster *clusterv1.Cluster) error {
 		return err
 	}
 
-	err = createMasterConfigMaps(cluster, clientset, input)
+	err = createMasterConfigMaps(cluster, a.Clientset, input)
 	if err != nil {
 		return err
 	}
-	err = createWorkerConfigMaps(cluster, clientset, input)
+	err = createWorkerConfigMaps(cluster, a.Clientset, input)
 	if err != nil {
 		return err
 	}
@@ -78,12 +86,20 @@ func (a *ClusterActuator) Reconcile(cluster *clusterv1.Cluster) error {
 
 // Delete deletes a cluster and is invoked by the Cluster Controller
 func (a *ClusterActuator) Delete(cluster *clusterv1.Cluster) error {
-	clientset, err := utils.CreateK8sClientSet()
-	if err != nil {
-		return err
+
+	//Find all machines associated with this cluster and error if there are any
+	//Avoids orphaning machines
+	machines := &clusterv1.MachineList{}
+	listOptions := &client.ListOptions{}
+	listOptions.MatchingLabels(map[string]string{"cluster.k8s.io/cluster-name": cluster.ObjectMeta.Name})
+	listOptions.InNamespace("")
+	a.controllerClient.List(context.Background(), listOptions, machines)
+	if len(machines.Items) > 0 {
+		return errors.New("machines exist for cluster. failing to delete")
 	}
 
-	err = deleteConfigMaps(cluster, clientset)
+	//Clean up configmaps we create a cluster creation time
+	err := deleteConfigMaps(cluster, a.Clientset)
 	if err != nil {
 		return err
 	}
@@ -93,6 +109,11 @@ func (a *ClusterActuator) Delete(cluster *clusterv1.Cluster) error {
 
 // createMasterConfigMaps generates certs and creates configmaps that define the userdata for each node
 func createMasterConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset, input *generate.Input) error {
+	spec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
+	if err != nil {
+		return err
+	}
+
 	talosconfig, err := generate.Talosconfig(input)
 	if err != nil {
 		return err
@@ -103,12 +124,15 @@ func createMasterConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Cl
 		return err
 	}
 
-	controlPlaneData, err := generate.Userdata(generate.TypeControlPlane, input)
-	if err != nil {
-		return err
-	}
+	allData := []string{initData}
 
-	allData := []string{initData, controlPlaneData, controlPlaneData}
+	for i := 1; i < len(spec.Masters.IPs); i++ {
+		controlPlaneData, err := generate.Userdata(generate.TypeControlPlane, input)
+		if err != nil {
+			return err
+		}
+		allData = append(allData, controlPlaneData)
+	}
 
 	for index, userdata := range allData {
 		name := cluster.ObjectMeta.Name + "-master-" + strconv.Itoa(index)
@@ -150,7 +174,7 @@ func createConfigMap(clientset *kubernetes.Clientset, name string, data map[stri
 	}
 
 	_, err := clientset.CoreV1().ConfigMaps(ClusterAPIProviderTalosNamespace).Create(cm)
-	if errors.IsAlreadyExists(err) {
+	if k8serrors.IsAlreadyExists(err) {
 		_, err = clientset.CoreV1().ConfigMaps(ClusterAPIProviderTalosNamespace).Update(cm)
 	}
 
@@ -169,13 +193,13 @@ func deleteConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Clientse
 	for index := range spec.Masters.IPs {
 		name := cluster.ObjectMeta.Name + "-master-" + strconv.Itoa(index)
 		err = clientset.CoreV1().ConfigMaps(ClusterAPIProviderTalosNamespace).Delete(name, nil)
-		if err != nil && !errors.IsNotFound(err) {
+		if err != nil && !k8serrors.IsNotFound(err) {
 			return err
 		}
 	}
 
 	err = clientset.CoreV1().ConfigMaps(ClusterAPIProviderTalosNamespace).Delete(cluster.ObjectMeta.Name+"-workers", nil)
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !k8serrors.IsNotFound(err) {
 		return err
 	}
 

@@ -56,7 +56,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	machineActuator, err := machine.NewMachineActuator(machine.MachineActuatorParams{})
+	machineActuator, err := machine.NewMachineActuator(mgr, machine.MachineActuatorParams{})
 	if err != nil {
 		panic(err)
 	}

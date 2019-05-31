@@ -268,7 +268,7 @@ func fetchInstanceID(clusterName string, instanceName string, client *ec2.EC2) (
 		return nil, nil
 	}
 	if len(res.Reservations[0].Instances) > 1 {
-		return nil, errors.New("[AWS] Multiple instanes with same filter info")
+		return nil, errors.New("[AWS] Multiple instances with same filter info")
 	}
 
 	return res.Reservations[0].Instances[0].InstanceId, nil
