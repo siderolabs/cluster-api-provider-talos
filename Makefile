@@ -2,26 +2,19 @@ TAG = $(shell gitmeta image tag)
 REPO = autonomy/cluster-api-provider-talos
 # Image URL to use all building/pushing image targets
 IMG ?= $(REPO):$(TAG)
-KUBEBUILDER_VER ?= 1.0.8
+
 all: test manager
 
-test-prep:
-	wget https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${KUBEBUILDER_VER}/kubebuilder_${KUBEBUILDER_VER}_linux_amd64.tar.gz
-	tar -xvf kubebuilder_${KUBEBUILDER_VER}_linux_amd64.tar.gz
-	mv kubebuilder_${KUBEBUILDER_VER}_linux_amd64 kubebuilder
-	mv kubebuilder /usr/local
-
-
 # Run tests
-test: generate fmt vet
-	go test ./pkg/... ./cmd/... -coverprofile cover.out
+test:
+	docker build . --target $@ -t $(REPO):test
 
 # Build manager binary
 manager: generate fmt vet
 	go build -o bin/manager github.com/talos-systems/cluster-api-provider-talos/cmd/manager
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet
+run: generate
 	go run ./cmd/manager/main.go
 
 # Install CRDs into a cluster
@@ -39,14 +32,6 @@ manifests:
 	kustomize build config/default/ > provider-components.yaml
 	echo "---" >> provider-components.yaml
 	kustomize build vendor/sigs.k8s.io/cluster-api/config/default/ >> provider-components.yaml
-
-# Run go fmt against code
-fmt:
-	go fmt ./pkg/... ./cmd/...
-
-# Run go vet against code
-vet:
-	go vet ./pkg/... ./cmd/...
 
 # Generate code
 generate:
