@@ -1,6 +1,7 @@
-
+TAG = $(shell gitmeta image tag)
+REPO = autonomy/cluster-api-provider-talos
 # Image URL to use all building/pushing image targets
-IMG ?= autonomy/cluster-api-provider-talos:latest
+IMG ?= $(REPO):$(TAG)
 KUBEBUILDER_VER ?= 1.0.8
 all: test manager
 
@@ -56,11 +57,17 @@ endif
 
 # Build the docker image
 docker-build:
-	docker build . -t ${IMG}
-	
+	docker build . -t $(IMG)
+
 	# @echo "updating kustomize image patch file for manager resource"
 	# sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
 
 # Push the docker image
 docker-push:
-	docker push ${IMG}
+	@docker tag $(REPO):$(TAG) $(REPO):latest
+	@docker push $(REPO):$(TAG)
+	@docker push $(REPO):latest
+
+.PHONY: login
+login:
+	@docker login --username "$(DOCKER_USERNAME)" --password "$(DOCKER_PASSWORD)"
