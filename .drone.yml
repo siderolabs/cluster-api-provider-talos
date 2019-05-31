@@ -34,9 +34,21 @@ steps:
     environment:
       GOPATH: /go
       GOBIN: /go/bin
-      IMG: autonomy/cluster-api-provider-talos:latest
     depends_on:
-    - fetch
+      - fetch
+
+  - name: gen-manifests
+    image: golang:latest
+    commands:
+      - go get github.com/talos-systems/gitmeta
+      - wget -O /usr/local/bin/kustomize https://github.com/kubernetes-sigs/kustomize/releases/download/v1.0.11/kustomize_1.0.11_linux_amd64
+      - chmod +x /usr/local/bin/kustomize
+      - make manifests
+    environment:
+      GOPATH: /go
+      GOBIN: /go/bin
+    depends_on:
+      - test
 
   - name: build
     image: autonomy/build-container:latest
@@ -47,7 +59,7 @@ steps:
     - name: dockersock
       path: /var/run
     depends_on:
-    - test
+      - test
 
   - name: push
     image: autonomy/build-container:latest
@@ -58,15 +70,33 @@ steps:
       DOCKER_PASSWORD:
         from_secret: docker_password
     commands:
-    - make login
-    - make docker-push
+      - make login
+      - make docker-push
     volumes:
     - name: dockersock
       path: /var/run
+    depends_on:
+      - build
     when:
       event:
+        include:
+          - push
+          - tag
         exclude:
         - pull_request
+
+  - name: release
+    image: plugins/github-release
+    settings:
+      api_key:
+        from_secret: github_token
+      draft: true
+      files:
+        - provider-components.yaml
+    depends_on:
+      - gen-manifests
+    when:
+      event: tag
 
 volumes:
 - name: dockersock

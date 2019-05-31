@@ -59,7 +59,7 @@ spec:
           - name: GOOGLE_APPLICATION_CREDENTIALS
             value: /.gce/service-account.json
           - name: PACKET_AUTH_TOKEN
-            value: {{PACKET_AUTH_TOKEN}}
+            value: "{{PACKET_AUTH_TOKEN}}"
         resources:
           limits:
             cpu: 100m

@@ -35,6 +35,7 @@ deploy: manifests
 # Generate manifests e.g. CRD, RBAC etc.
 manifests:
 	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go all
+	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
 	sed -i'' -e 's@^- manager_auth_proxy_patch.yaml.*@#&@' config/default/kustomization.yaml
 	kustomize build config/default/ > provider-components.yaml
 	echo "---" >> provider-components.yaml
@@ -58,9 +59,6 @@ endif
 # Build the docker image
 docker-build:
 	docker build . -t $(IMG)
-
-	# @echo "updating kustomize image patch file for manager resource"
-	# sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
 
 # Push the docker image
 docker-push:
