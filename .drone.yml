@@ -67,6 +67,8 @@ steps:
       event:
         exclude:
         - pull_request
+    depends_on:
+    - build
 
 volumes:
 - name: dockersock
