@@ -1,0 +1,22 @@
+- op: replace
+  path: /spec/template/spec/providerSpec/value/platform
+  value:
+    config: |-
+      projectid: {{PROJECT_ID}}
+      instances:
+        plan: "t1.small.x86"
+        facility: "sjc1"
+        pxeurl: "http://{{PXE_SERVER}}/boot.ipxe"
+        install:
+          wipe: false
+          force: true
+          boot:
+            device: /dev/sda
+            size: 1024000000
+          root:
+            device: /dev/sda
+            size: 2048000000
+          data:
+            device: /dev/sda
+            size: 4096000000
+    type: packet

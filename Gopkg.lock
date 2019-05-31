@@ -66,6 +66,14 @@
   revision = "3a771d992973f24aa725d07868b467d1ddfceafb"
 
 [[projects]]
+  digest = "1:b5f139796b532342966b835fb26fe41b6b488e94b914f1af1aba4cd3a9fee6dc"
+  name = "github.com/containerd/containerd"
+  packages = ["defaults"]
+  pruneopts = "T"
+  revision = "894b81a4b802e4eb2a91d1ce216b8817763c29fb"
+  version = "v1.2.6"
+
+[[projects]]
   digest = "1:9f42202ac457c462ad8bb9642806d275af9ab4850cf0b1960b9c6f083d4a309a"
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
@@ -343,6 +351,14 @@
   version = "v1.5.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:3a3637219ce1ded78e79dc7819bad62763fd2918e94f55158490134b9e12a77c"
+  name = "github.com/packethost/packngo"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "1343be729ca20b6995673cefc97ec82f87b5b57d"
+
+[[projects]]
   digest = "1:e5d0bd87abc2781d14e274807a470acd180f0499f8bf5bb18606e9ec22ad9de9"
   name = "github.com/pborman/uuid"
   packages = ["."]
@@ -460,15 +476,17 @@
   version = "v1.0.3"
 
 [[projects]]
-  digest = "1:6483012b84a9778e8cd74855e090aab7a56eadb9de2c06c2339c684368289162"
+  digest = "1:3fcb1b4d3131a411f7300946cd50fcb01a64b0785cfab878b4e4091f62fd6b63"
   name = "github.com/talos-systems/talos"
   packages = [
+    "internal/pkg/constants",
+    "internal/pkg/kernel",
     "pkg/crypto/x509",
     "pkg/userdata/generate",
   ]
   pruneopts = "T"
-  revision = "3585ab2ad0b239876d893a981905f3e43503ef29"
-  version = "v0.1.0-alpha.24"
+  revision = "bbbd1f70d1626803532864904070f667a27d541a"
+  version = "v0.1.0-alpha.27"
 
 [[projects]]
   digest = "1:32a5dad5ad78e69220779ed344fc656c88227255e12770fc09e86eeb5ac2364e"
@@ -859,6 +877,7 @@
     "pkg/util/uuid",
     "pkg/util/validation",
     "pkg/util/validation/field",
+    "pkg/util/version",
     "pkg/util/wait",
     "pkg/util/yaml",
     "pkg/version",
@@ -949,6 +968,17 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:0f72be182610b8305eb8e4921d6bc068d858dfa3d7561c135b81190e8f48a83d"
+  name = "k8s.io/cluster-bootstrap"
+  packages = [
+    "token/api",
+    "token/util",
+  ]
+  pruneopts = "T"
+  revision = "a235353312ed20f14e7d2386377ed2fb2f1275cc"
+
+[[projects]]
+  branch = "master"
   digest = "1:2d821667dbd520a7ef31bdc923543f197ba30021b4317fd8871618ada52f23b0"
   name = "k8s.io/code-generator"
   packages = [
@@ -967,6 +997,14 @@
   ]
   pruneopts = "T"
   revision = "e4c2b1329cf785363b23612eebf93bb4c2affdb4"
+
+[[projects]]
+  branch = "master"
+  digest = "1:de0cae391ffc19649f79e80f4a593c1ad75ff179688b6eb7fa31e03c106a641b"
+  name = "k8s.io/component-base"
+  packages = ["config"]
+  pruneopts = "T"
+  revision = "c51d9557ffd060c38827cc4ffd183514993aaa97"
 
 [[projects]]
   branch = "master"
@@ -999,6 +1037,23 @@
   packages = ["pkg/util/proto"]
   pruneopts = "T"
   revision = "5e45bb682580c9be5ffa4d27d367f0eeba125c7b"
+
+[[projects]]
+  digest = "1:125142a42600d29329b4d1367772d36f510449ad4476f7c9b7a45eb4e32250b0"
+  name = "k8s.io/kubernetes"
+  packages = [
+    "cmd/kubeadm/app/apis/kubeadm",
+    "cmd/kubeadm/app/apis/kubeadm/v1beta1",
+    "cmd/kubeadm/app/constants",
+    "pkg/apis/core",
+    "pkg/kubelet/apis/config",
+    "pkg/proxy/apis/config",
+    "pkg/registry/core/service/allocator",
+    "pkg/registry/core/service/ipallocator",
+  ]
+  pruneopts = "T"
+  revision = "66049e3b21efe110454d67df4fa62b08ea79a19b"
+  version = "v1.14.2"
 
 [[projects]]
   digest = "1:07bf69e67f3e57593c9d9f70be97b11dfb61b53e51cf5c5380437821f6983142"
@@ -1109,6 +1164,7 @@
     "github.com/emicklei/go-restful",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
+    "github.com/packethost/packngo",
     "github.com/talos-systems/talos/pkg/userdata/generate",
     "golang.org/x/net/context",
     "google.golang.org/api/compute/v1",
