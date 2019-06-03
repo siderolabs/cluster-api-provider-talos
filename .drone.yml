@@ -11,16 +11,16 @@ services:
   image: docker:dind
   privileged: true
   volumes:
-  - name: dockersock
-    path: /var/run
-  - name: tmp
-    path: /tmp
+    - name: dockersock
+      path: /var/run
+    - name: tmp
+      path: /tmp
 
 steps:
   - name: fetch
     image: docker:git
     commands:
-    - git fetch --tags
+      - git fetch --tags
     when:
       event: tag
 
@@ -29,10 +29,25 @@ steps:
     commands:
       - make test
     volumes:
-    - name: dockersock
-      path: /var/run
+      - name: dockersock
+        path: /var/run
     depends_on:
-    - fetch
+      - fetch
+
+  - name: gen-manifests
+    image: autonomy/build-container:latest
+    commands:
+      - make manifests
+    environment:
+      GOPATH: /go
+      GOBIN: /go/bin
+    volumes:
+      - name: manifests
+        path: /tmp/manifests
+      - name: dockersock
+        path: /var/run
+    depends_on:
+      - test
 
   - name: build
     image: autonomy/build-container:latest
@@ -40,10 +55,10 @@ steps:
     commands:
       - make docker-build
     volumes:
-    - name: dockersock
-      path: /var/run
+      - name: dockersock
+        path: /var/run
     depends_on:
-    - test
+      - test
 
   - name: push
     image: autonomy/build-container:latest
@@ -54,17 +69,17 @@ steps:
       DOCKER_PASSWORD:
         from_secret: docker_password
     commands:
-    - make login
-    - make docker-push
+      - make login
+      - make docker-push
     volumes:
-    - name: dockersock
-      path: /var/run
+      - name: dockersock
+        path: /var/run
     when:
       event:
         exclude:
-        - pull_request
+          - pull_request
     depends_on:
-    - build
+      - build
 
   - name: release
     image: plugins/github-release
@@ -73,12 +88,20 @@ steps:
         from_secret: github_token
       draft: true
       files:
-        - provider-components.yaml
+        - /tmp/manifests/*
+      checksum:
+        - sha256
+        - sha512
+    volumes:
+      - name: manifests
+        path: /tmp/manifests
     depends_on:
-      - build
+      - gen-manifests
     when:
       event: tag
 
 volumes:
-- name: dockersock
-  temp: {}
+  - name: dockersock
+    temp: {}
+  - name: manifests
+    temp: {}

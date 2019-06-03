@@ -33,13 +33,9 @@ deploy: manifests
 	cat provider-components.yaml | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
-manifests:
-	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go all
-	sed -i'' -e 's@^- manager_auth_proxy_patch.yaml.*@#&@' config/default/kustomization.yaml
-	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
-	kustomize build config/default/ > provider-components.yaml
-	echo "---" >> provider-components.yaml
-	kustomize build vendor/sigs.k8s.io/cluster-api/config/default/ >> provider-components.yaml
+manifests: 
+	docker build . --target $@ -t $(REPO):manifests --build-arg IMG="$(REPO):$(TAG)"
+	docker run $(REPO):manifests bash -c 'cat /tmp/manifests/provider-components.yaml' > /tmp/manifests/provider-components.yaml
 
 # Build the docker image
 docker-build:

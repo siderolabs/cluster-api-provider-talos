@@ -1,18 +1,13 @@
 ARG KUBEBUILDER_VERSION=1.0.8
+ARG KUSTOMIZE_VERSION=1.0.11
 
-# Build the manager binary
 FROM golang:1.10.3 as vendor
+COPY ./ /go/src/github.com/talos-systems/cluster-api-provider-talos/
 RUN go get github.com/golang/dep/cmd/dep
 WORKDIR /go/src/github.com/talos-systems/cluster-api-provider-talos
-COPY Gopkg.lock .
-COPY Gopkg.toml .
 RUN dep ensure -v -vendor-only
 
 FROM vendor AS generate
-COPY config/    config/
-COPY hack/    hack/
-COPY pkg/    pkg/
-COPY cmd/    cmd/
 RUN go generate ./pkg/... ./cmd/...
 
 FROM generate AS test
@@ -23,8 +18,21 @@ RUN go fmt ./pkg/... ./cmd/...
 RUN go vet ./pkg/... ./cmd/...
 RUN go test ./pkg/... ./cmd/... -coverprofile cover.out
 
+FROM test AS manifests
+ARG IMG
+ARG KUSTOMIZE_VERSION
+RUN mkdir -p /tmp/manifests
+RUN wget -O /usr/local/bin/kustomize https://github.com/kubernetes-sigs/kustomize/releases/download/v${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64
+RUN chmod +x /usr/local/bin/kustomize
+RUN	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go all
+RUN	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
+RUN	sed -i'' -e 's@^- manager_auth_proxy_patch.yaml.*@#&@' config/default/kustomization.yaml
+RUN	kustomize build config/default/ > /tmp/manifests/provider-components.yaml
+RUN	echo "---" >> /tmp/manifests/provider-components.yaml
+RUN	kustomize build vendor/sigs.k8s.io/cluster-api/config/default/ >> /tmp/manifests/provider-components.yaml
+
 # Build the manager binary
-FROM test AS build
+FROM manifests AS build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager github.com/talos-systems/cluster-api-provider-talos/cmd/manager
 
 # Copy the controller-manager into a thin image
