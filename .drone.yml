@@ -34,6 +34,21 @@ steps:
     depends_on:
     - fetch
 
+  - name: gen-manifests
+    image: autonomy/build-container:latest
+    commands:
+      - make manifests
+    environment:
+      GOPATH: /go
+      GOBIN: /go/bin
+    volumes:
+      - name: manifests
+        path: /tmp/manifests
+      - name: dockersock
+        path: /var/run
+    depends_on:
+    - test
+
   - name: build
     image: autonomy/build-container:latest
     pull: always
@@ -73,12 +88,17 @@ steps:
         from_secret: github_token
       draft: true
       files:
-        - provider-components.yaml
+        - /tmp/manifests/provider-components.yaml
+    volumes:
+      - name: manifests
+        path: /tmp/manifests
     depends_on:
-      - build
+      - gen-manifests
     when:
       event: tag
 
 volumes:
 - name: dockersock
+  temp: {}
+- name: manifests
   temp: {}
