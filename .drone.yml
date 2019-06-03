@@ -66,6 +66,19 @@ steps:
     depends_on:
     - build
 
+  - name: release
+    image: plugins/github-release
+    settings:
+      api_key:
+        from_secret: github_token
+      draft: true
+      files:
+        - provider-components.yaml
+    depends_on:
+      - build
+    when:
+      event: tag
+
 volumes:
 - name: dockersock
   temp: {}

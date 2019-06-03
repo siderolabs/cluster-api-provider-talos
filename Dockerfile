@@ -24,7 +24,7 @@ RUN go vet ./pkg/... ./cmd/...
 RUN go test ./pkg/... ./cmd/... -coverprofile cover.out
 
 # Build the manager binary
-FROM generate AS build
+FROM test AS build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager github.com/talos-systems/cluster-api-provider-talos/cmd/manager
 
 # Copy the controller-manager into a thin image
