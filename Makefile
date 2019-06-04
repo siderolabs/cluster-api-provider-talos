@@ -1,5 +1,5 @@
-TAG = $(shell gitmeta image tag)
-REPO = autonomy/cluster-api-provider-talos
+TAG ?= $(shell gitmeta image tag)
+REPO ?= autonomy/cluster-api-provider-talos
 
 all: test docker-build
 

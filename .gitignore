@@ -26,3 +26,5 @@ vendor
 
 provider-components.yaml
 cover.out
+sha256sum.txt
+sha512sum.txt
