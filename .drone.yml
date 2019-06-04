@@ -97,6 +97,7 @@ steps:
         path: /tmp/manifests
     depends_on:
       - gen-manifests
+      - push
     when:
       event: tag
 
