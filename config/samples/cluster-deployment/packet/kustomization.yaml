@@ -17,8 +17,7 @@ patchesJson6902:
       kind: Machine
       name: talos-test-cluster-master-0
     path: platform-config-masters.yaml
-
-  # Uncomment for HA masters
+  ## UNCOMMENT FOR MULTIPLE MASTERS
   # - target:
   #     group: cluster.k8s.io
   #     version: v1alpha1
