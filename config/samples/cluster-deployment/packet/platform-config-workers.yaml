@@ -13,9 +13,12 @@
           boot:
             device: /dev/sda
             size: 1024000000
+            kernel: http://{{PXE_SERVER}}/assets/talos/nightly/vmlinuz
+            initramfs: http://{{PXE_SERVER}}/assets/talos/nightly/initramfs.xz
           root:
             device: /dev/sda
             size: 2048000000
+            rootfs: http://{{PXE_SERVER}}/assets/talos/nightly/rootfs.tar.gz
           data:
             device: /dev/sda
             size: 4096000000

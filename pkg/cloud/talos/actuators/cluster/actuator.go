@@ -19,6 +19,7 @@ package cluster
 import (
 	"context"
 	"errors"
+	"net"
 	"strconv"
 
 	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/utils"
@@ -119,6 +120,7 @@ func createMasterConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Cl
 		return err
 	}
 
+	input.IP = net.ParseIP(spec.Masters.IPs[0])
 	initData, err := generate.Userdata(generate.TypeInit, input)
 	if err != nil {
 		return err
@@ -127,6 +129,7 @@ func createMasterConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Cl
 	allData := []string{initData}
 
 	for i := 1; i < len(spec.Masters.IPs); i++ {
+		input.IP = net.ParseIP(spec.Masters.IPs[i])
 		controlPlaneData, err := generate.Userdata(generate.TypeControlPlane, input)
 		if err != nil {
 			return err
