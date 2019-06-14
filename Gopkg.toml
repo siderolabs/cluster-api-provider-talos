@@ -19,6 +19,14 @@ required = [
 [prune]
   go-tests = true
 
+[[constraint]]
+  name="github.com/talos-systems/talos"
+  branch="master"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/packethost/packngo"
+  
 # STANZAS BELOW ARE GENERATED AND MAY BE WRITTEN - DO NOT MODIFY BELOW THIS LINE.
 
 [[constraint]]
@@ -35,6 +43,4 @@ name = "gopkg.in/fsnotify.v1"
 source = "https://github.com/fsnotify/fsnotify.git"
 version="v1.4.7"
 
-[[constraint]]
-  branch = "master"
-  name = "github.com/packethost/packngo"
+

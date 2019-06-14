@@ -476,7 +476,8 @@
   version = "v1.0.3"
 
 [[projects]]
-  digest = "1:2e381a6292b677821f60c7c99a3e8273dff2295d2ef8cc57bb31b599d43708bf"
+  branch = "master"
+  digest = "1:e9ff5473258cd50df773296c64000277cc835e1f72e28f5048df41acd7672d50"
   name = "github.com/talos-systems/talos"
   packages = [
     "internal/pkg/constants",
@@ -486,8 +487,7 @@
     "pkg/userdata/token",
   ]
   pruneopts = "T"
-  revision = "84616b48b35b9da8395fc85b299b8fd6967b3731"
-  version = "v0.1.0-alpha.28"
+  revision = "4168111ae5a4d43da72502e53ad0fca3d45cab68"
 
 [[projects]]
   digest = "1:32a5dad5ad78e69220779ed344fc656c88227255e12770fc09e86eeb5ac2364e"

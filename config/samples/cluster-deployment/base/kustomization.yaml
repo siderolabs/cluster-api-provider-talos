@@ -1,6 +1,7 @@
 resources:
   - cluster.yaml
   - master-0.yaml
+  # Uncomment for HA masters
   # - master-1.yaml
   # - master-2.yaml
   - worker-machines.yaml
