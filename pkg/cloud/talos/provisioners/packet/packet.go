@@ -39,15 +39,15 @@ type Userdata struct {
 	Security   interface{}
 	Services   interface{}
 	Install    map[string]interface{}
-	Networking Network
+	Networking *Network
 }
 
 type Network struct {
-	OS OS
+	OS *OS `yaml:"os,omitempty"`
 }
 
 type OS struct {
-	Devices []map[string]interface{}
+	Devices []map[string]interface{} `yaml:"devices,omitempty"`
 }
 
 //NewPacket returns an instance of the Packet provisioner
@@ -104,6 +104,9 @@ func (packet *Packet) Create(cluster *clusterv1.Cluster, machine *clusterv1.Mach
 		floatingIP = clusterSpec.Masters.IPs[index]
 
 		//Haxx on haxx b/c dhcp value needs to be a bool so the whole networking.os.devices block needs to be a map of interfaces
+		if udStruct.Networking == nil {
+			udStruct.Networking = &Network{OS: &OS{Devices: make([]map[string]interface{}, 0)}}
+		}
 		udStruct.Networking.OS.Devices = append(udStruct.Networking.OS.Devices, map[string]interface{}{"interface": "lo", "cidr": floatingIP + "/32"})
 		udStruct.Networking.OS.Devices = append(udStruct.Networking.OS.Devices, map[string]interface{}{"interface": "eth0", "dhcp": true})
 	}
