@@ -17,20 +17,18 @@ patchesJson6902:
       kind: Machine
       name: talos-test-cluster-master-0
     path: platform-config-masters.yaml
-
-  # Uncomment for HA masters
-  # - target:
-  #     group: cluster.k8s.io
-  #     version: v1alpha1
-  #     kind: Machine
-  #     name: talos-test-cluster-master-1
-  #   path: platform-config-masters.yaml
-  # - target:
-  #     group: cluster.k8s.io
-  #     version: v1alpha1
-  #     kind: Machine
-  #     name: talos-test-cluster-master-2
-  #   path: platform-config-masters.yaml
+  - target:
+      group: cluster.k8s.io
+      version: v1alpha1
+      kind: Machine
+      name: talos-test-cluster-master-1
+    path: platform-config-masters.yaml
+  - target:
+      group: cluster.k8s.io
+      version: v1alpha1
+      kind: Machine
+      name: talos-test-cluster-master-2
+    path: platform-config-masters.yaml
 
   ##Patch workers with packet config
   - target:
