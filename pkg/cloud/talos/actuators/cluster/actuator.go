@@ -130,6 +130,7 @@ func createMasterConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Cl
 
 	for i := 1; i < len(spec.Masters.IPs); i++ {
 		input.IP = net.ParseIP(spec.Masters.IPs[i])
+		input.Index = i - 1
 		controlPlaneData, err := generate.Userdata(generate.TypeControlPlane, input)
 		if err != nil {
 			return err
