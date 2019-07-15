@@ -7,14 +7,16 @@ workspace:
   path: src/github.com/talos-systems/cluster-api-provider-talos
 
 services:
-- name: docker
-  image: docker:dind
-  privileged: true
-  volumes:
-    - name: dockersock
-      path: /var/run
-    - name: tmp
-      path: /tmp
+  - name: docker
+    image: docker:dind
+    privileged: true
+    command:
+      - --dns=8.8.8.8
+      - --dns=8.8.4.4
+      - --mtu=1440
+    volumes:
+      - name: dockersock
+        path: /var/run
 
 steps:
   - name: fetch
@@ -103,6 +105,4 @@ steps:
 
 volumes:
   - name: dockersock
-    temp: {}
-  - name: manifests
     temp: {}
