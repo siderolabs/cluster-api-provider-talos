@@ -17,6 +17,8 @@ services:
     volumes:
       - name: dockersock
         path: /var/run
+      - name: manifests
+        path: /tmp/manifests
 
 steps:
   - name: fetch
@@ -105,4 +107,6 @@ steps:
 
 volumes:
   - name: dockersock
+    temp: {}
+  - name: manifests
     temp: {}
