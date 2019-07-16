@@ -183,7 +183,7 @@ func (gce *GCE) Exists(cluster *clusterv1.Cluster, machine *clusterv1.Machine, c
 }
 
 func client(clientset *kubernetes.Clientset) (*compute.Service, error) {
-	creds, err := clientset.CoreV1().Secrets("cluster-api-provider-talos-system").Get("machine-controller-credential", metav1.GetOptions{})
+	creds, err := clientset.CoreV1().Secrets("cluster-api-provider-talos-system").Get("gce-credentials", metav1.GetOptions{})
 	if k8serrors.IsNotFound(err) {
 		return nil, err
 	}
