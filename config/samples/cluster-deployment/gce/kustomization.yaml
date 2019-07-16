@@ -34,6 +34,6 @@ patchesJson6902:
   - target:
       group: cluster.k8s.io
       version: v1alpha1
-      kind: MachineSet
+      kind: MachineDeployment
       name: talos-test-cluster-workers
     path: platform-config-workers.yaml
