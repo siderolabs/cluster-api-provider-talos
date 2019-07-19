@@ -137,6 +137,15 @@ func (gce *GCE) Update(cluster *clusterv1.Cluster, machine *clusterv1.Machine, c
 // Delete deletes a GCE instance.
 func (gce *GCE) Delete(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
 
+	// If instance isn't found by name, assume we no longer need to delete
+	exists, err := gce.Exists(cluster, machine, clientset)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return nil
+	}
+
 	machineSpec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
 	if err != nil {
 		return err
