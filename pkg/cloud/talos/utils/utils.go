@@ -16,7 +16,7 @@ import (
 
 //RandomString simply returns a string of length n
 func RandomString(n int) string {
-	var letter = []rune("abcdefghijklmnopqrstuvwxy0123456789")
+	var letter = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy0123456789")
 
 	b := make([]rune, n)
 	for i := range b {

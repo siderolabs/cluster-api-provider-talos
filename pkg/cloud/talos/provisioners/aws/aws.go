@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"log"
@@ -47,7 +48,7 @@ func NewAWS() (*AWS, error) {
 }
 
 // Create creates an instance in AWS.
-func (aws *AWS) Create(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
+func (aws *AWS) Create(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
 
 	// TODO: There's a lot of repition of this machinespec -> ec2client block. Need to see if there's a more DRY way.
 	// Fish out configs and create an ec2 client
@@ -150,12 +151,12 @@ func (aws *AWS) Create(cluster *clusterv1.Cluster, machine *clusterv1.Machine, c
 }
 
 //Update updates a given AWS instance.
-func (aws *AWS) Update(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
+func (aws *AWS) Update(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
 	return nil
 }
 
 // Delete deletes a AWS instance.
-func (aws *AWS) Delete(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
+func (aws *AWS) Delete(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
 
 	// Fish out configs and create an ec2 client
 	machineSpec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
@@ -172,7 +173,7 @@ func (aws *AWS) Delete(cluster *clusterv1.Cluster, machine *clusterv1.Machine, c
 	}
 
 	//Make sure instance exists before attempting delete
-	exists, err := aws.Exists(cluster, machine, clientset)
+	exists, err := aws.Exists(ctx, cluster, machine, clientset)
 	if err != nil {
 		return err
 	}
@@ -198,7 +199,7 @@ func (aws *AWS) Delete(cluster *clusterv1.Cluster, machine *clusterv1.Machine, c
 }
 
 // Exists returns whether or not an instance is present in AWS.
-func (aws *AWS) Exists(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) (bool, error) {
+func (aws *AWS) Exists(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) (bool, error) {
 	// Fish out configs and create an ec2 client
 	machineSpec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
 	if err != nil {

@@ -1,6 +1,7 @@
 package packet
 
 import (
+	"context"
 	"errors"
 	"log"
 	"strconv"
@@ -61,7 +62,7 @@ func NewPacket() (*Packet, error) {
 }
 
 // Create creates an instance in Packet.
-func (packet *Packet) Create(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
+func (packet *Packet) Create(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
 
 	clusterSpec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
 	if err != nil {
@@ -153,12 +154,12 @@ func (packet *Packet) Create(cluster *clusterv1.Cluster, machine *clusterv1.Mach
 }
 
 //Update updates a given Packet instance.
-func (packet *Packet) Update(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
+func (packet *Packet) Update(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
 	return nil
 }
 
 // Delete deletes a Packet instance.
-func (packet *Packet) Delete(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
+func (packet *Packet) Delete(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
 
 	dev, err := packet.fetchDevice(machine)
 	if err != nil {
@@ -175,7 +176,7 @@ func (packet *Packet) Delete(cluster *clusterv1.Cluster, machine *clusterv1.Mach
 }
 
 // Exists returns whether or not an instance is present in AWS.
-func (packet *Packet) Exists(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) (bool, error) {
+func (packet *Packet) Exists(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) (bool, error) {
 
 	dev, err := packet.fetchDevice(machine)
 	if err != nil {
