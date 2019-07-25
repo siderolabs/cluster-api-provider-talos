@@ -66,7 +66,7 @@ func (a *MachineActuator) Create(ctx context.Context, cluster *clusterv1.Cluster
 		return err
 	}
 
-	err = provisioner.Create(cluster, machine, a.Clientset)
+	err = provisioner.Create(ctx, cluster, machine, a.Clientset)
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func (a *MachineActuator) Delete(ctx context.Context, cluster *clusterv1.Cluster
 		return err
 	}
 
-	err = provisioner.Delete(cluster, machine, a.Clientset)
+	err = provisioner.Delete(ctx, cluster, machine, a.Clientset)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (a *MachineActuator) Update(ctx context.Context, cluster *clusterv1.Cluster
 		return err
 	}
 
-	err = provisioner.Update(cluster, machine, a.Clientset)
+	err = provisioner.Update(ctx, cluster, machine, a.Clientset)
 	if err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func (a *MachineActuator) Exists(ctx context.Context, cluster *clusterv1.Cluster
 		return true, err
 	}
 
-	exists, err := provisioner.Exists(cluster, machine, a.Clientset)
+	exists, err := provisioner.Exists(ctx, cluster, machine, a.Clientset)
 	if err != nil {
 		return true, err
 	}

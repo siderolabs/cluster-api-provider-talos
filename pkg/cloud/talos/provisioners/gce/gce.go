@@ -47,7 +47,7 @@ func NewGCE() (*GCE, error) {
 }
 
 // Create creates an instance in GCE.
-func (gce *GCE) Create(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
+func (gce *GCE) Create(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
 
 	clusterSpec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
 	if err != nil {
@@ -129,16 +129,16 @@ func (gce *GCE) Create(cluster *clusterv1.Cluster, machine *clusterv1.Machine, c
 }
 
 //Update updates a given GCE instance.
-func (gce *GCE) Update(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
+func (gce *GCE) Update(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
 
 	return nil
 }
 
 // Delete deletes a GCE instance.
-func (gce *GCE) Delete(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
+func (gce *GCE) Delete(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
 
 	// If instance isn't found by name, assume we no longer need to delete
-	exists, err := gce.Exists(cluster, machine, clientset)
+	exists, err := gce.Exists(ctx, cluster, machine, clientset)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func (gce *GCE) Delete(cluster *clusterv1.Cluster, machine *clusterv1.Machine, c
 }
 
 // Exists returns whether or not an instance is present in GCE.
-func (gce *GCE) Exists(cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) (bool, error) {
+func (gce *GCE) Exists(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) (bool, error) {
 	machineSpec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
 	if err != nil {
 		return false, err
