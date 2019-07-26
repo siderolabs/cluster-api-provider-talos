@@ -19,6 +19,7 @@ package cluster
 import (
 	"context"
 	"errors"
+	"log"
 	"net"
 	"strconv"
 
@@ -63,6 +64,7 @@ func NewClusterActuator(mgr manager.Manager, params ClusterActuatorParams) (*Clu
 // Reconcile reconciles a cluster and is invoked by the Cluster Controller
 // TODO: This needs to be idempotent. Check if these certs and stuff already exist
 func (a *ClusterActuator) Reconcile(cluster *clusterv1.Cluster) error {
+	log.Printf("Reconciling cluster %v.", cluster.Name)
 
 	spec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
 	if err != nil {
@@ -178,8 +180,10 @@ func createConfigMap(clientset *kubernetes.Clientset, name string, data map[stri
 	}
 
 	_, err := clientset.CoreV1().ConfigMaps(ClusterAPIProviderTalosNamespace).Create(cm)
+	// Essentially no-op if CMs are already there
 	if k8serrors.IsAlreadyExists(err) {
-		_, err = clientset.CoreV1().ConfigMaps(ClusterAPIProviderTalosNamespace).Update(cm)
+		return nil
+		//_, err = clientset.CoreV1().ConfigMaps(ClusterAPIProviderTalosNamespace).Update(cm)
 	}
 
 	return err
