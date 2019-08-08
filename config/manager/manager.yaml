@@ -56,17 +56,19 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
+          - name: AZURE_AUTH_LOCATION
+            value: /.azure/service-account.json
           - name: GOOGLE_APPLICATION_CREDENTIALS
             value: /.gce/service-account.json
           - name: PACKET_AUTH_TOKEN
             value: "{{PACKET_AUTH_TOKEN}}"
         resources:
           limits:
-            cpu: 100m
-            memory: 30Mi
+            cpu: 1000m
+            memory: 1000Mi
           requests:
             cpu: 100m
-            memory: 20Mi
+            memory: 100Mi
         ports:
         - containerPort: 9876
           name: webhook-server
@@ -75,6 +77,8 @@ spec:
         - mountPath: /tmp/cert
           name: cert
           readOnly: true
+        - mountPath: /.azure
+          name: azure-credentials
         - name: gce-credentials
           mountPath: /.gce
         - name: aws-credentials
@@ -87,6 +91,9 @@ spec:
         secret:
           defaultMode: 420
           secretName: webhook-server-secret
+      - name: azure-credentials
+        secret:
+          secretName: azure-credentials
       - name: gce-credentials
         secret:
           secretName: gce-credentials
