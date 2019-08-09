@@ -225,38 +225,9 @@ func (azure *Az) Delete(ctx context.Context, cluster *clusterv1.Cluster, machine
 	if err != nil {
 		return err
 	}
-	err = vmfuture.WaitForCompletionRef(ctx, vmClient.Client)
-	if err != nil {
-		return err
-	}
 
-	// Cleanup os disk
-	disksClient, err := disksclient()
-	if err != nil {
-		return err
-	}
-	disksfuture, err := disksClient.Delete(ctx, azureConfig.ResourceGroup, machine.ObjectMeta.Name+"-os-disk")
-	if err != nil {
-		return err
-	}
-	err = disksfuture.WaitForCompletionRef(ctx, disksClient.Client)
-	if err != nil {
-		return err
-	}
-
-	// Cleanup nic
-	nicClient, err := nicclient()
-	if err != nil {
-		return err
-	}
-	nicfuture, err := nicClient.Delete(ctx, azureConfig.ResourceGroup, machine.ObjectMeta.Name+"-nic")
-	if err != nil {
-		return err
-	}
-	err = nicfuture.WaitForCompletionRef(ctx, nicClient.Client)
-	if err != nil {
-		return err
-	}
+	// Wait for deletion in bg and cleanup osdisk and nic afterwards
+	go finishInstanceCleanup(ctx, vmClient, vmfuture, azureConfig.ResourceGroup, machine.ObjectMeta.Name)
 
 	log.Println("[Azure] Instance deleted: " + machine.ObjectMeta.Name)
 
@@ -285,6 +256,38 @@ func (azure *Az) Exists(ctx context.Context, cluster *clusterv1.Cluster, machine
 	}
 
 	return true, nil
+}
+
+// finishInstanceCleanup waits for a VM to be deleted and then cleans up the associated nic and os disk.
+// doing this as a goroutine from Delete() so that we can parallelize the deletes in Azure.
+func finishInstanceCleanup(ctx context.Context, vmClient *compute.VirtualMachinesClient, vmfuture compute.VirtualMachinesDeleteFuture, resourceGroup string, instanceName string) {
+
+	// Have to wait for VM to be torn down before we can drop the disk and nic.
+	err := vmfuture.WaitForCompletionRef(ctx, vmClient.Client)
+	if err != nil {
+		log.Println("[Azure] Failed to wait for completion of VM delete")
+	}
+
+	// Cleanup os disk
+	disksClient, err := disksclient()
+	if err != nil {
+		log.Println("[Azure] Failed creation of disk client")
+	}
+	_, err = disksClient.Delete(ctx, resourceGroup, instanceName+"-os-disk")
+	if err != nil {
+		log.Println("[Azure] Failed to delete os disk")
+	}
+
+	// Cleanup nic
+	nicClient, err := nicclient()
+	if err != nil {
+		log.Println("[Azure] Failed creation of nic client")
+	}
+	_, err = nicClient.Delete(ctx, resourceGroup, instanceName+"-nic")
+	if err != nil {
+		log.Println("[Azure] Failed to delete nic")
+	}
+
 }
 
 // getSubnetByName finds a given subnet (required for input along with network)

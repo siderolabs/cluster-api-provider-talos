@@ -8,7 +8,8 @@ workspace:
 
 services:
   - name: docker
-    image: docker:dind
+    image: docker:19.03-dind
+    entrypoint: [dockerd]
     privileged: true
     command:
       - --dns=8.8.8.8
