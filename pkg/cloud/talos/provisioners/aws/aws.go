@@ -24,6 +24,11 @@ type AWS struct {
 
 // ClusterInfo holds data about desired config in cluster object
 type ClusterInfo struct {
+	Region string
+}
+
+// MachineInfo holds data about desired config in cluster object
+type MachineInfo struct {
 	Region    string
 	Instances InstanceInfo
 }
@@ -50,19 +55,12 @@ func NewAWS() (*AWS, error) {
 // Create creates an instance in AWS.
 func (aws *AWS) Create(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
 
-	// TODO: There's a lot of repition of this machinespec -> ec2client block. Need to see if there's a more DRY way.
-	// Fish out configs and create an ec2 client
-	clusterSpec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
-	if err != nil {
-		return err
-	}
-
 	machineSpec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
 	if err != nil {
 		return err
 	}
 
-	awsConfig := &ClusterInfo{}
+	awsConfig := &MachineInfo{}
 	yaml.Unmarshal([]byte(machineSpec.Platform.Config), awsConfig)
 
 	ec2client, err := client(awsConfig.Region)
@@ -73,13 +71,13 @@ func (aws *AWS) Create(ctx context.Context, cluster *clusterv1.Cluster, machine 
 	//fetch floating IP if master and userdata based on machine name
 	natIP := ""
 	if strings.Contains(machine.ObjectMeta.Name, "master") {
-		nameSlice := strings.Split(machine.ObjectMeta.Name, "-")
-		indexString := nameSlice[len(nameSlice)-1]
-		index, err := strconv.Atoi(indexString)
+
+		// Find public ip
+		address, err := getPublicIPByName(ec2client, machine.ObjectMeta.Name+"-ip")
 		if err != nil {
 			return err
 		}
-		natIP = clusterSpec.Masters.IPs[index]
+		natIP = *address.PublicIp
 	}
 
 	udConfigMap, err := utils.FetchConfigMap(cluster, machine, clientset)
@@ -164,7 +162,7 @@ func (aws *AWS) Delete(ctx context.Context, cluster *clusterv1.Cluster, machine 
 		return err
 	}
 
-	awsConfig := &ClusterInfo{}
+	awsConfig := &MachineInfo{}
 	yaml.Unmarshal([]byte(machineSpec.Platform.Config), awsConfig)
 
 	ec2client, err := client(awsConfig.Region)
@@ -206,7 +204,7 @@ func (aws *AWS) Exists(ctx context.Context, cluster *clusterv1.Cluster, machine 
 		return false, err
 	}
 
-	awsConfig := &ClusterInfo{}
+	awsConfig := &MachineInfo{}
 	yaml.Unmarshal([]byte(machineSpec.Platform.Config), awsConfig)
 
 	ec2client, err := client(awsConfig.Region)
@@ -223,6 +221,125 @@ func (aws *AWS) Exists(ctx context.Context, cluster *clusterv1.Cluster, machine 
 		return false, nil
 	}
 	return true, nil
+}
+
+// AllocateExternalIPs creates IPs for the control plane nodes
+func (aws *AWS) AllocateExternalIPs(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset) ([]string, error) {
+	// Fish out configs and create an ec2 client
+	clusterSpec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	awsConfig := &ClusterInfo{}
+	yaml.Unmarshal([]byte(clusterSpec.Platform.Config), awsConfig)
+
+	ec2client, err := client(awsConfig.Region)
+	if err != nil {
+		return nil, err
+	}
+
+	floatingIPs := []string{}
+	for i := 0; i < clusterSpec.ControlPlane.Count; i++ {
+
+		// Check if ips already exist and add to list early if so
+		flip, err := getPublicIPByName(ec2client, cluster.ObjectMeta.Name+"-master-"+strconv.Itoa(i)+"-ip")
+		if err != nil {
+			return nil, err
+		}
+		if flip != nil {
+			floatingIPs = append(floatingIPs, *flip.PublicIp)
+			continue
+		}
+
+		// Allocate elastic ip
+		allocRes, err := ec2client.AllocateAddress(&ec2.AllocateAddressInput{
+			Domain: awspkg.String("vpc"),
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		// Add tags to the created instance
+		_, err = ec2client.CreateTags(&ec2.CreateTagsInput{
+			Resources: []*string{allocRes.AllocationId},
+			Tags: []*ec2.Tag{
+				{
+					Key:   awspkg.String("Name"),
+					Value: awspkg.String(cluster.ObjectMeta.Name + "-master-" + strconv.Itoa(i) + "-ip"),
+				},
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		floatingIPs = append(floatingIPs, *allocRes.PublicIp)
+	}
+
+	return floatingIPs, nil
+}
+
+// DeAllocateExternalIPs cleans IPs for the control plane nodes
+func (aws *AWS) DeAllocateExternalIPs(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset) error {
+	// Fish out configs and create an ec2 client
+	clusterSpec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
+	if err != nil {
+		return err
+	}
+
+	awsConfig := &ClusterInfo{}
+	yaml.Unmarshal([]byte(clusterSpec.Platform.Config), awsConfig)
+
+	ec2client, err := client(awsConfig.Region)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < clusterSpec.ControlPlane.Count; i++ {
+
+		// Check if ips already exist and add to list early if so
+		flip, err := getPublicIPByName(ec2client, cluster.ObjectMeta.Name+"-master-"+strconv.Itoa(i)+"-ip")
+		if err != nil {
+			return err
+		}
+
+		// Ignore if not found
+		if flip == nil {
+			return nil
+		}
+
+		_, err = ec2client.ReleaseAddress(&ec2.ReleaseAddressInput{
+			AllocationId: flip.AllocationId,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// getPublicIPbyName finds the public IP object from a list of all IP objects
+func getPublicIPByName(ec2client *ec2.EC2, name string) (*ec2.Address, error) {
+	result, err := ec2client.DescribeAddresses(&ec2.DescribeAddressesInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   awspkg.String("tag:Name"),
+				Values: awspkg.StringSlice([]string{name}),
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(result.Addresses) > 0 {
+		return result.Addresses[0], nil
+	}
+
+	// Not found
+	return nil, nil
 }
 
 // client generates an ec2 client to use

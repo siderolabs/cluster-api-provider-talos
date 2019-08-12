@@ -24,6 +24,12 @@ type GCE struct {
 
 // ClusterInfo holds data about desired config in cluster object
 type ClusterInfo struct {
+	Region  string
+	Project string
+}
+
+// MachineInfo holds data about desired config in machine object
+type MachineInfo struct {
 	Zone      string
 	Project   string
 	Instances InstanceInfo
@@ -49,17 +55,12 @@ func NewGCE() (*GCE, error) {
 // Create creates an instance in GCE.
 func (gce *GCE) Create(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
 
-	clusterSpec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
-	if err != nil {
-		return err
-	}
-
 	machineSpec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
 	if err != nil {
 		return err
 	}
 
-	gceConfig := &ClusterInfo{}
+	gceConfig := &MachineInfo{}
 	yaml.Unmarshal([]byte(machineSpec.Platform.Config), gceConfig)
 
 	computeService, err := client(clientset)
@@ -80,13 +81,18 @@ func (gce *GCE) Create(ctx context.Context, cluster *clusterv1.Cluster, machine 
 		if k8serrors.IsNotFound(err) {
 			return err
 		}
-		nameSlice := strings.Split(machine.ObjectMeta.Name, "-")
-		indexString := nameSlice[len(nameSlice)-1]
-		index, err := strconv.Atoi(indexString)
+
+		// Parse the region out of zone
+		zoneSlice := strings.Split(gceConfig.Zone, "-")
+		regionSlice := zoneSlice[:len(zoneSlice)-1]
+		region := strings.Join(regionSlice, "-")
+
+		// Find public ip
+		address, err := getPublicIPByName(computeService, machine.ObjectMeta.Name+"-ip", gceConfig.Project, region)
 		if err != nil {
 			return err
 		}
-		natIP = clusterSpec.Masters.IPs[index]
+		natIP = address.Address
 	}
 	ud := udConfigMap.Data["userdata"]
 
@@ -151,7 +157,7 @@ func (gce *GCE) Delete(ctx context.Context, cluster *clusterv1.Cluster, machine 
 		return err
 	}
 
-	gceConfig := &ClusterInfo{}
+	gceConfig := &MachineInfo{}
 	yaml.Unmarshal([]byte(machineSpec.Platform.Config), gceConfig)
 
 	computeService, err := client(clientset)
@@ -173,7 +179,7 @@ func (gce *GCE) Exists(ctx context.Context, cluster *clusterv1.Cluster, machine 
 		return false, err
 	}
 
-	gceConfig := &ClusterInfo{}
+	gceConfig := &MachineInfo{}
 	yaml.Unmarshal([]byte(machineSpec.Platform.Config), gceConfig)
 
 	computeService, err := client(clientset)
@@ -189,6 +195,92 @@ func (gce *GCE) Exists(ctx context.Context, cluster *clusterv1.Cluster, machine 
 	}
 
 	return true, nil
+}
+
+// AllocateExternalIPs creates IPs for the control plane nodes
+func (gce *GCE) AllocateExternalIPs(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset) ([]string, error) {
+	clusterSpec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	gceConfig := &ClusterInfo{}
+	yaml.Unmarshal([]byte(clusterSpec.Platform.Config), gceConfig)
+
+	computeService, err := client(clientset)
+	if err != nil {
+		return nil, err
+	}
+
+	floatingIPs := []string{}
+	for i := 0; i < clusterSpec.ControlPlane.Count; i++ {
+
+		//Check for address existence and return early if we can
+		address, err := getPublicIPByName(computeService, cluster.ObjectMeta.Name+"-master-"+strconv.Itoa(i)+"-ip", gceConfig.Project, gceConfig.Region)
+		if err != nil {
+			return nil, err
+		}
+		if address != nil {
+			floatingIPs = append(floatingIPs, address.Address)
+			continue
+		}
+
+		// Insert the address and try again
+		_, err = computeService.Addresses.Insert(gceConfig.Project, gceConfig.Region, &compute.Address{Name: cluster.ObjectMeta.Name + "-master-" + strconv.Itoa(i) + "-ip"}).Do()
+		if err != nil {
+			return nil, err
+		}
+		address, err = getPublicIPByName(computeService, cluster.ObjectMeta.Name+"-master-"+strconv.Itoa(i)+"-ip", gceConfig.Project, gceConfig.Region)
+		if err != nil {
+			return nil, err
+		}
+		floatingIPs = append(floatingIPs, address.Address)
+	}
+
+	return floatingIPs, nil
+}
+
+// DeAllocateExternalIPs cleans IPs for the control plane nodes
+func (gce *GCE) DeAllocateExternalIPs(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset) error {
+
+	clusterSpec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
+	if err != nil {
+		return err
+	}
+
+	gceConfig := &ClusterInfo{}
+	yaml.Unmarshal([]byte(clusterSpec.Platform.Config), gceConfig)
+
+	computeService, err := client(clientset)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < clusterSpec.ControlPlane.Count; i++ {
+		_, err = computeService.Addresses.Delete(gceConfig.Project, gceConfig.Region, cluster.ObjectMeta.Name+"-master-"+strconv.Itoa(i)+"-ip").Do()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func getPublicIPByName(computeService *compute.Service, name string, project string, region string) (*compute.Address, error) {
+	addressList, err := computeService.Addresses.List(project, region).Do()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, address := range addressList.Items {
+		if address.Name == name {
+			return address, nil
+		}
+	}
+
+	// Nothing found
+	return nil, nil
+
 }
 
 func client(clientset *kubernetes.Clientset) (*compute.Service, error) {

@@ -27,9 +27,7 @@ There are sample kustomize templates in [config/samples/cluster-deployment/packe
 
 - In Packet, create a small subnet of elastic IPs for attaching to your masters. A /30 subnet should work well. Take note of the IPs in this subnet for the next step. General instructions for creating these [here](https://support.packet.com/kb/articles/elastic-ips).
 
-- Edit `master-ips.yaml` with the IPs created in the previous step.
-
-- Edit `platform-config-master.yaml`, and `platform-config-workers.yaml` with your relevant data. 
+- Edit `platform-config-cluster.yaml`, `platform-config-master.yaml`, and `platform-config-workers.yaml` with your relevant data, adding the IP block created above to `platform-config-cluster.yaml`.
 
 - From `config/samples/cluster-deployment/packet` issue `kustomize build | kubectl apply -f -`.
 

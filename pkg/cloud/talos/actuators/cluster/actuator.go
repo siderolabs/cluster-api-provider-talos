@@ -23,6 +23,7 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/provisioners"
 	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/utils"
 	"github.com/talos-systems/talos/pkg/userdata/generate"
 	v1 "k8s.io/api/core/v1"
@@ -71,7 +72,19 @@ func (a *ClusterActuator) Reconcile(cluster *clusterv1.Cluster) error {
 		return err
 	}
 
-	input, err := generate.NewInput(cluster.ObjectMeta.Name, spec.Masters.IPs)
+	//Generate external IPs depending on provisioner
+	provisioner, err := provisioners.NewProvisioner(spec.Platform.Type)
+	if err != nil {
+		return err
+	}
+
+	masterIPs, err := provisioner.AllocateExternalIPs(cluster, a.Clientset)
+	if err != nil {
+		return err
+	}
+
+	//Create machine config, using IPs allocated above
+	input, err := generate.NewInput(cluster.ObjectMeta.Name, masterIPs)
 	if err != nil {
 		return err
 	}
@@ -101,8 +114,24 @@ func (a *ClusterActuator) Delete(cluster *clusterv1.Cluster) error {
 		return errors.New("machines exist for cluster. failing to delete")
 	}
 
+	spec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
+	if err != nil {
+		return err
+	}
+
+	//Clean up external IPs depending on provisioner
+	provisioner, err := provisioners.NewProvisioner(spec.Platform.Type)
+	if err != nil {
+		return err
+	}
+
+	err = provisioner.DeAllocateExternalIPs(cluster, a.Clientset)
+	if err != nil {
+		return err
+	}
+
 	//Clean up configmaps we create a cluster creation time
-	err := deleteConfigMaps(cluster, a.Clientset)
+	err = deleteConfigMaps(cluster, a.Clientset)
 	if err != nil {
 		return err
 	}
@@ -112,17 +141,13 @@ func (a *ClusterActuator) Delete(cluster *clusterv1.Cluster) error {
 
 // createMasterConfigMaps generates certs and creates configmaps that define the userdata for each node
 func createMasterConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset, input *generate.Input) error {
-	spec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
-	if err != nil {
-		return err
-	}
 
 	talosconfig, err := generate.Talosconfig(input)
 	if err != nil {
 		return err
 	}
 
-	input.IP = net.ParseIP(spec.Masters.IPs[0])
+	input.IP = net.ParseIP(input.MasterIPs[0])
 	initData, err := generate.Userdata(generate.TypeInit, input)
 	if err != nil {
 		return err
@@ -130,8 +155,8 @@ func createMasterConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Cl
 
 	allData := []string{initData}
 
-	for i := 1; i < len(spec.Masters.IPs); i++ {
-		input.IP = net.ParseIP(spec.Masters.IPs[i])
+	for i := 1; i < len(input.MasterIPs); i++ {
+		input.IP = net.ParseIP(input.MasterIPs[i])
 		input.Index = i - 1
 		controlPlaneData, err := generate.Userdata(generate.TypeControlPlane, input)
 		if err != nil {
@@ -198,7 +223,7 @@ func deleteConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Clientse
 		return err
 	}
 
-	for index := range spec.Masters.IPs {
+	for index := 0; index < spec.ControlPlane.Count; index++ {
 		name := cluster.ObjectMeta.Name + "-master-" + strconv.Itoa(index)
 		err = clientset.CoreV1().ConfigMaps(ClusterAPIProviderTalosNamespace).Delete(name, nil)
 		if err != nil && !k8serrors.IsNotFound(err) {

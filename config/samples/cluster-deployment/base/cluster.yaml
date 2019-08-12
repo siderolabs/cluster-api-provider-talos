@@ -14,5 +14,6 @@ spec:
     value:
       apiVersion: "talosproviderconfig/v1alpha1"
       kind: "TalosClusterProviderSpec"
-      masters:
-        ips: []
+      platform: {}
+      controlplane:
+        count: 3

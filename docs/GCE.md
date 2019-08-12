@@ -33,10 +33,8 @@ In your cluster that you'll be using to create other clusters, you must prepare 
 
 There are sample kustomize templates in [config/samples/cluster-deployment/gce](../config/samples/cluster-deployment/gce) for deploying clusters. These will be our starting point.
 
-- In GCE, create an external IP address for each of your desired masters. Take note of these IPs for the next step.
+- Edit `platform-config-cluster.yaml`, `platform-config-master.yaml`, and `platform-config-workers.yaml` with your relevant data. 
 
-- Edit `master-ips.yaml`, `platform-config-master.yaml`, and `platform-config-workers.yaml` with your relevant data. 
-
-- From `config/samples/cluster-deployment/gce` issue `kustomize build | kubectl apply -f -`.
+- From `config/samples/cluster-deployment/gce` issue `kustomize build | kubectl apply -f -`. External IPs will get created and associated with Control Plane nodes automatically.
 
 - The talos config for your master can be found with `kubectl get cm -n cluster-api-provider-talos-system talos-test-cluster-master-0 -o jsonpath='{.data.talosconfig}'`.

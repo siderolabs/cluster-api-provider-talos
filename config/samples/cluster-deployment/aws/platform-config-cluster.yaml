@@ -1,0 +1,6 @@
+- op: replace
+  path: /spec/providerSpec/value/platform
+  value:
+    config: |-
+      region: "us-west-2"
+    type: aws

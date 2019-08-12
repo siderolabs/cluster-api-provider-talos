@@ -18,6 +18,9 @@ type Provisioner interface {
 
 	Delete(context.Context, *clusterv1.Cluster, *clusterv1.Machine, *kubernetes.Clientset) error
 	Exists(context.Context, *clusterv1.Cluster, *clusterv1.Machine, *kubernetes.Clientset) (bool, error)
+
+	AllocateExternalIPs(*clusterv1.Cluster, *kubernetes.Clientset) ([]string, error)
+	DeAllocateExternalIPs(*clusterv1.Cluster, *kubernetes.Clientset) error
 }
 
 func NewProvisioner(id string) (Provisioner, error) {

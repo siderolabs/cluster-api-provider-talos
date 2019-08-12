@@ -20,14 +20,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-//TalosClusterMastersSpec is the spec that defines info about cluster masters
-type TalosClusterMastersSpec struct {
-	IPs []string `json:"ips,omitempty"`
+//TalosClusterControlPlaneSpec is the spec that defines info about cluster controlplane
+type TalosClusterControlPlaneSpec struct {
+	Count int `json:"count,omitempty"`
 }
 
-//TalosClusterWorkerSpec is the spec that defines info about cluster masters
-type TalosClusterWorkerSpec struct {
-	Name string `json:"name,omitempty"`
+//TalosClusterPlatformSpec defines info about platform configs
+type TalosClusterPlatformSpec struct {
+	Type   string `json:"type,omitempty"`
+	Config string `json:"config,omitempty"`
 }
 
 // TalosClusterProviderSpecStatus defines the observed state of TalosClusterProviderSpec
@@ -45,9 +46,9 @@ type TalosClusterProviderSpec struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Masters TalosClusterMastersSpec        `json:"masters,omitempty"`
-	Workers []TalosClusterWorkerSpec       `json:"workers,omitempty"`
-	Status  TalosClusterProviderSpecStatus `json:"status,omitempty"`
+	ControlPlane TalosClusterControlPlaneSpec   `json:"controlplane,omitempty"`
+	Platform     TalosClusterPlatformSpec       `json:"platform,omitempty"`
+	Status       TalosClusterProviderSpecStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
