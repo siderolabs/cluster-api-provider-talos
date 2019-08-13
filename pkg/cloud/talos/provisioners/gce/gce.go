@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -225,11 +226,18 @@ func (gce *GCE) AllocateExternalIPs(cluster *clusterv1.Cluster, clientset *kuber
 			continue
 		}
 
-		// Insert the address and try again
-		_, err = computeService.Addresses.Insert(gceConfig.Project, gceConfig.Region, &compute.Address{Name: cluster.ObjectMeta.Name + "-master-" + strconv.Itoa(i) + "-ip"}).Do()
+		// Insert the address and wait for it to be ready
+		op, err := computeService.Addresses.Insert(gceConfig.Project, gceConfig.Region, &compute.Address{Name: cluster.ObjectMeta.Name + "-master-" + strconv.Itoa(i) + "-ip"}).Do()
 		if err != nil {
 			return nil, err
 		}
+
+		opStatus := &compute.Operation{}
+		for opStatus.Status != "DONE" {
+			opStatus, err = computeService.RegionOperations.Get(gceConfig.Project, gceConfig.Region, op.Name).Do()
+			time.Sleep(5 * time.Second)
+		}
+
 		address, err = getPublicIPByName(computeService, cluster.ObjectMeta.Name+"-master-"+strconv.Itoa(i)+"-ip", gceConfig.Project, gceConfig.Region)
 		if err != nil {
 			return nil, err
@@ -257,8 +265,8 @@ func (gce *GCE) DeAllocateExternalIPs(cluster *clusterv1.Cluster, clientset *kub
 	}
 
 	for i := 0; i < clusterSpec.ControlPlane.Count; i++ {
-		_, err = computeService.Addresses.Delete(gceConfig.Project, gceConfig.Region, cluster.ObjectMeta.Name+"-master-"+strconv.Itoa(i)+"-ip").Do()
-		if err != nil {
+		_, err := computeService.Addresses.Delete(gceConfig.Project, gceConfig.Region, cluster.ObjectMeta.Name+"-master-"+strconv.Itoa(i)+"-ip").Do()
+		if err != nil && !strings.Contains(err.Error(), "notFound") {
 			return err
 		}
 	}
