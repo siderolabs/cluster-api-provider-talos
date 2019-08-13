@@ -10,7 +10,6 @@ This guide assumes you have several prereqs created in Azure. These are:
 - Virtual network
 - Subnet in the virtual network
 - A security group for the subnet that allows ports 443, 50000, 50001
-- Public IPs for each master
 - Storage account for image upload
 - The Azure CLI configured and talking to your Azure account
 
@@ -43,8 +42,8 @@ In your cluster that you'll be using to create other clusters, you must prepare 
 
 There are sample kustomize templates in [config/samples/cluster-deployment/azure](../config/samples/cluster-deployment/azure) for deploying clusters. These will be our starting point.
 
-- Edit `master-ips.yaml`, `platform-config-master.yaml`, and `platform-config-workers.yaml` with your relevant data from the prereqs mentioned above. 
+- Edit `platform-config-cluster.yaml`, `platform-config-master.yaml`, and `platform-config-workers.yaml` with your relevant data from the prereqs mentioned above. 
 
-- From `config/samples/cluster-deployment/azure` issue `kustomize build | kubectl apply -f -`.
+- From `config/samples/cluster-deployment/azure` issue `kustomize build | kubectl apply -f -`. External IPs will get created and associated with Control Plane nodes automatically.
 
 - The talos config for your master can be found with `kubectl get cm -n cluster-api-provider-talos-system talos-test-cluster-master-0 -o jsonpath='{.data.talosconfig}'`.

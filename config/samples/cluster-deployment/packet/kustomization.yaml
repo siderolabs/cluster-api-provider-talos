@@ -8,7 +8,7 @@ patchesJson6902:
       version: v1alpha1
       kind: Cluster
       name: talos-test-cluster
-    path: master-ips.yaml
+    path: platform-config-cluster.yaml
 
   ##Patch each master with packet config
   - target:
@@ -17,18 +17,18 @@ patchesJson6902:
       kind: Machine
       name: talos-test-cluster-master-0
     path: platform-config-masters.yaml
-  # - target:
-  #     group: cluster.k8s.io
-  #     version: v1alpha1
-  #     kind: Machine
-  #     name: talos-test-cluster-master-1
-  #   path: platform-config-masters.yaml
-  # - target:
-  #     group: cluster.k8s.io
-  #     version: v1alpha1
-  #     kind: Machine
-  #     name: talos-test-cluster-master-2
-  #   path: platform-config-masters.yaml
+  - target:
+      group: cluster.k8s.io
+      version: v1alpha1
+      kind: Machine
+      name: talos-test-cluster-master-1
+    path: platform-config-masters.yaml
+  - target:
+      group: cluster.k8s.io
+      version: v1alpha1
+      kind: Machine
+      name: talos-test-cluster-master-2
+    path: platform-config-masters.yaml
 
   ##Patch workers with packet config
   - target:

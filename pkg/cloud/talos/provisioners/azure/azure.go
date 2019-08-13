@@ -32,6 +32,12 @@ type Az struct {
 type ClusterInfo struct {
 	Location      string
 	ResourceGroup string
+}
+
+// MachineInfo holds data about desired config in machine object
+type MachineInfo struct {
+	Location      string
+	ResourceGroup string
 	Instances     InstanceInfo
 }
 
@@ -62,17 +68,13 @@ func NewAz() (*Az, error) {
 
 // Create creates an instance in Azure.
 func (azure *Az) Create(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
-	clusterSpec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
-	if err != nil {
-		return err
-	}
 
 	machineSpec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
 	if err != nil {
 		return err
 	}
 
-	azureConfig := &ClusterInfo{}
+	azureConfig := &MachineInfo{}
 	yaml.Unmarshal([]byte(machineSpec.Platform.Config), azureConfig)
 
 	// Dig out the subnet for our nic
@@ -89,14 +91,7 @@ func (azure *Az) Create(ctx context.Context, cluster *clusterv1.Cluster, machine
 
 	// Find the public IP we want to use if necessary
 	if !strings.Contains(machine.ObjectMeta.Name, "worker") {
-		nameSlice := strings.Split(machine.ObjectMeta.Name, "-")
-		indexString := nameSlice[len(nameSlice)-1]
-		index, err := strconv.Atoi(indexString)
-		if err != nil {
-			return err
-		}
-		publicIP := clusterSpec.Masters.IPs[index]
-		publicIPObject, err := getPublicIPbyIP(ctx, publicIP, azureConfig.ResourceGroup)
+		publicIPObject, err := getPublicIPByName(ctx, machine.ObjectMeta.Name+"-ip", azureConfig.ResourceGroup)
 		if err != nil {
 			return err
 		}
@@ -214,7 +209,7 @@ func (azure *Az) Delete(ctx context.Context, cluster *clusterv1.Cluster, machine
 		return err
 	}
 
-	azureConfig := &ClusterInfo{}
+	azureConfig := &MachineInfo{}
 	yaml.Unmarshal([]byte(machineSpec.Platform.Config), azureConfig)
 
 	// Cleanup VM
@@ -265,7 +260,7 @@ func (azure *Az) Exists(ctx context.Context, cluster *clusterv1.Cluster, machine
 		return false, err
 	}
 
-	azureConfig := &ClusterInfo{}
+	azureConfig := &MachineInfo{}
 	yaml.Unmarshal([]byte(machineSpec.Platform.Config), azureConfig)
 
 	vmClient, err := vmclient()
@@ -282,8 +277,94 @@ func (azure *Az) Exists(ctx context.Context, cluster *clusterv1.Cluster, machine
 	return true, nil
 }
 
+// AllocateExternalIPs creates IPs for the control plane nodes
+func (azure *Az) AllocateExternalIPs(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset) ([]string, error) {
+
+	clusterSpec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	azureConfig := &ClusterInfo{}
+	yaml.Unmarshal([]byte(clusterSpec.Platform.Config), azureConfig)
+	client, err := ipclient()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := context.Background()
+	floatingIPs := []string{}
+	for i := 0; i < clusterSpec.ControlPlane.Count; i++ {
+
+		// Check if ips already exist and add to list early if so
+		flip, err := getPublicIPByName(ctx, cluster.ObjectMeta.Name+"-master-"+strconv.Itoa(i)+"-ip", azureConfig.ResourceGroup)
+		if err != nil {
+			return nil, err
+		}
+		if flip != nil {
+			floatingIPs = append(floatingIPs, *flip.PublicIPAddressPropertiesFormat.IPAddress)
+			continue
+		}
+
+		// Create IP if needed
+		result, err := client.CreateOrUpdate(
+			ctx,
+			azureConfig.ResourceGroup,
+			cluster.ObjectMeta.Name+"-master-"+strconv.Itoa(i)+"-ip",
+			network.PublicIPAddress{
+				Sku: &network.PublicIPAddressSku{
+					Name: network.PublicIPAddressSkuNameBasic,
+				},
+				PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+					PublicIPAllocationMethod: network.Static,
+					PublicIPAddressVersion:   network.IPv4,
+				},
+				Location: to.StringPtr(azureConfig.Location),
+			},
+		)
+
+		err = result.WaitForCompletionRef(ctx, client.Client)
+		if err != nil {
+			return nil, err
+		}
+
+		ip, err := result.Result(*client)
+		if err != nil {
+			return nil, err
+		}
+		floatingIPs = append(floatingIPs, *ip.PublicIPAddressPropertiesFormat.IPAddress)
+	}
+	return floatingIPs, nil
+}
+
+// DeAllocateExternalIPs cleans IPs for the control plane nodes
+func (azure *Az) DeAllocateExternalIPs(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset) error {
+
+	clusterSpec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
+	if err != nil {
+		return err
+	}
+
+	azureConfig := &ClusterInfo{}
+	yaml.Unmarshal([]byte(clusterSpec.Platform.Config), azureConfig)
+	client, err := ipclient()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+
+	for i := 0; i < clusterSpec.ControlPlane.Count; i++ {
+		_, err := client.Delete(ctx, azureConfig.ResourceGroup, cluster.ObjectMeta.Name+"-master-"+strconv.Itoa(i)+"-ip")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // getSubnetByName finds a given subnet (required for input along with network)
-func getSubnetByName(ctx context.Context, azureConfig *ClusterInfo) (*network.Subnet, error) {
+func getSubnetByName(ctx context.Context, azureConfig *MachineInfo) (*network.Subnet, error) {
 	client, err := subnetclient()
 	if err != nil {
 		return nil, err
@@ -295,6 +376,33 @@ func getSubnetByName(ctx context.Context, azureConfig *ClusterInfo) (*network.Su
 	}
 
 	return &subnet, nil
+}
+
+// getPublicIPbyName finds the public IP object from a list of all IP objects
+func getPublicIPByName(ctx context.Context, name string, resourceGroup string) (*network.PublicIPAddress, error) {
+	client, err := ipclient()
+	if err != nil {
+		return nil, err
+	}
+
+	//Dump all public IPs created and iterate to find our desired IP
+	list, err := client.ListComplete(ctx, resourceGroup)
+	if err != nil {
+		return nil, err
+	}
+	for list.NotDone() {
+		result := list.Value()
+		if *result.Name == name {
+			return &result, nil
+		}
+		err = list.NextWithContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// IP not found
+	return nil, nil
 }
 
 // getPublicIPbyIP finds the public IP object from a list of all IP objects

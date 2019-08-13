@@ -61,7 +61,12 @@ func NewMachineActuator(mgr manager.Manager, params MachineActuatorParams) (*Mac
 func (a *MachineActuator) Create(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine) error {
 	log.Printf("Creating machine %v for cluster %v.", machine.Name, cluster.Name)
 
-	provisioner, err := createProvisioner(machine)
+	spec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
+	if err != nil {
+		return err
+	}
+
+	provisioner, err := provisioners.NewProvisioner(spec.Platform.Type)
 	if err != nil {
 		return err
 	}
@@ -78,7 +83,12 @@ func (a *MachineActuator) Create(ctx context.Context, cluster *clusterv1.Cluster
 func (a *MachineActuator) Delete(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine) error {
 	log.Printf("Deleting machine %v for cluster %v.", machine.Name, cluster.Name)
 
-	provisioner, err := createProvisioner(machine)
+	spec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
+	if err != nil {
+		return err
+	}
+
+	provisioner, err := provisioners.NewProvisioner(spec.Platform.Type)
 	if err != nil {
 		return err
 	}
@@ -95,7 +105,12 @@ func (a *MachineActuator) Delete(ctx context.Context, cluster *clusterv1.Cluster
 func (a *MachineActuator) Update(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine) error {
 	log.Printf("Updating machine %v for cluster %v.", machine.Name, cluster.Name)
 
-	provisioner, err := createProvisioner(machine)
+	spec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
+	if err != nil {
+		return err
+	}
+
+	provisioner, err := provisioners.NewProvisioner(spec.Platform.Type)
 	if err != nil {
 		return err
 	}
@@ -111,7 +126,13 @@ func (a *MachineActuator) Update(ctx context.Context, cluster *clusterv1.Cluster
 // Exists tests for the existence of a machine and is invoked by the Machine Controller
 func (a *MachineActuator) Exists(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine) (bool, error) {
 	log.Printf("Checking if machine %v for cluster %v exists.", machine.Name, cluster.Name)
-	provisioner, err := createProvisioner(machine)
+
+	spec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
+	if err != nil {
+		return true, err
+	}
+
+	provisioner, err := provisioners.NewProvisioner(spec.Platform.Type)
 	if err != nil {
 		return true, err
 	}
@@ -122,19 +143,4 @@ func (a *MachineActuator) Exists(ctx context.Context, cluster *clusterv1.Cluster
 	}
 
 	return exists, nil
-}
-
-func createProvisioner(machine *clusterv1.Machine) (provisioners.Provisioner, error) {
-
-	machineSpec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
-	if err != nil {
-		return nil, err
-	}
-
-	provisioner, err := provisioners.NewProvisioner(machineSpec.Platform.Type)
-	if err != nil {
-		return nil, err
-	}
-
-	return provisioner, nil
 }

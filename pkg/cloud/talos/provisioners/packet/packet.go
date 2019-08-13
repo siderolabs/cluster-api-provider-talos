@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +23,12 @@ type Packet struct {
 
 // ClusterInfo holds data about desired config in cluster object
 type ClusterInfo struct {
+	ProjectID string
+	IPBlock   string
+}
+
+// MachineInfo holds data about desired config in cluster object
+type MachineInfo struct {
 	ProjectID string
 	Instances InstanceInfo
 }
@@ -63,18 +70,20 @@ func NewPacket() (*Packet, error) {
 
 // Create creates an instance in Packet.
 func (packet *Packet) Create(ctx context.Context, cluster *clusterv1.Cluster, machine *clusterv1.Machine, clientset *kubernetes.Clientset) error {
-
 	clusterSpec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
 	if err != nil {
 		return err
 	}
+
+	clusterConfig := &ClusterInfo{}
+	yaml.Unmarshal([]byte(clusterSpec.Platform.Config), clusterConfig)
 
 	machineSpec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
 	if err != nil {
 		return err
 	}
 
-	packetConfig := &ClusterInfo{}
+	packetConfig := &MachineInfo{}
 	yaml.Unmarshal([]byte(machineSpec.Platform.Config), packetConfig)
 
 	// Here we pull down the userdata config map and add the install section to the end if it's defined in the machine
@@ -99,10 +108,13 @@ func (packet *Packet) Create(ctx context.Context, cluster *clusterv1.Cluster, ma
 		if err != nil {
 			return err
 		}
-		if index > len(clusterSpec.Masters.IPs) {
-			return errors.New("No available floating IP")
+
+		ipList, err := getIPList(packet.client, clusterConfig.ProjectID, clusterConfig.IPBlock)
+		if err != nil {
+			return err
 		}
-		floatingIP = clusterSpec.Masters.IPs[index]
+
+		floatingIP = ipList[index]
 
 		//Haxx on haxx b/c dhcp value needs to be a bool so the whole networking.os.devices block needs to be a map of interfaces
 		if udStruct.Networking == nil {
@@ -189,12 +201,71 @@ func (packet *Packet) Exists(ctx context.Context, cluster *clusterv1.Cluster, ma
 	return true, nil
 }
 
+// AllocateExternalIPs creates IPs for the control plane nodes
+// Note: This is weird for packet. We still expect the block of IPs to pre-exist and we just list them out.
+func (packet *Packet) AllocateExternalIPs(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset) ([]string, error) {
+
+	clusterSpec, err := utils.ClusterProviderFromSpec(cluster.Spec.ProviderSpec)
+	if err != nil {
+		return nil, err
+	}
+	packetConfig := &ClusterInfo{}
+	yaml.Unmarshal([]byte(clusterSpec.Platform.Config), packetConfig)
+
+	ipList, err := getIPList(packet.client, packetConfig.ProjectID, packetConfig.IPBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	return ipList[:clusterSpec.ControlPlane.Count], nil
+}
+
+// DeAllocateExternalIPs cleans IPs for the control plane nodes
+// Note: Weird for packet. A no-op since we actually expect the block of IPs to be pre-created
+func (packet *Packet) DeAllocateExternalIPs(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset) error {
+	return nil
+}
+
+// Returns a full list of available IPs for a given CIDR block
+func getIPList(client *packngo.Client, projectID string, ipBlock string) ([]string, error) {
+	ipBlocks, _, err := client.ProjectIPs.List(projectID)
+	if err != nil {
+		return nil, err
+	}
+	var desiredBlock packngo.IPAddressReservation
+	for _, block := range ipBlocks {
+		if block.IpAddressCommon.Network+"/"+strconv.Itoa(block.IpAddressCommon.CIDR) == ipBlock {
+			desiredBlock = block
+		}
+	}
+
+	if desiredBlock.ID != "" {
+		available, _, err := client.ProjectIPs.AvailableAddresses(desiredBlock.ID, &packngo.AvailableRequest{CIDR: 32})
+		if err != nil {
+			return nil, err
+		}
+
+		ipList := []string{}
+		for _, addr := range available {
+			addrParsed, _, err := net.ParseCIDR(addr)
+			if err != nil {
+				return nil, err
+			}
+			ipList = append(ipList, addrParsed.String())
+		}
+		return ipList, nil
+	}
+
+	//Not found
+	return nil, errors.New("[Packet] Unable to find or parse desired IP block")
+}
+
 func (packet *Packet) fetchDevice(machine *clusterv1.Machine) (*packngo.Device, error) {
 	machineSpec, err := utils.MachineProviderFromSpec(machine.Spec.ProviderSpec)
 	if err != nil {
 		return nil, err
 	}
-	packetConfig := &ClusterInfo{}
+	packetConfig := &MachineInfo{}
 	yaml.Unmarshal([]byte(machineSpec.Platform.Config), packetConfig)
 
 	devList, _, err := packet.client.Devices.List(packetConfig.ProjectID, &packngo.ListOptions{})
