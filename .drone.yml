@@ -9,17 +9,19 @@ workspace:
 services:
   - name: docker
     image: docker:19.03-dind
-    entrypoint: [dockerd]
-    privileged: true
+    entrypoint:
+    - dockerd
     command:
-      - --dns=8.8.8.8
-      - --dns=8.8.4.4
-      - --mtu=1440
+    - --dns=8.8.8.8
+    - --dns=8.8.4.4
+    - --mtu=1440
+    - --log-level=error
+    privileged: true
     volumes:
-      - name: dockersock
-        path: /var/run
-      - name: manifests
-        path: /tmp/manifests
+    - name: dockersock
+      path: /var/run
+    - name: manifests
+      path: /tmp/manifests
 
 steps:
   - name: fetch

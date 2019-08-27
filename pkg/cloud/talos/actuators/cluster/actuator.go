@@ -25,7 +25,7 @@ import (
 
 	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/provisioners"
 	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/utils"
-	"github.com/talos-systems/talos/pkg/userdata/generate"
+	"github.com/talos-systems/talos/pkg/userdata/v1/generate"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -157,7 +157,8 @@ func createMasterConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Cl
 
 	for i := 1; i < len(input.MasterIPs); i++ {
 		input.IP = net.ParseIP(input.MasterIPs[i])
-		input.Index = i - 1
+		input.Index = i
+
 		controlPlaneData, err := generate.Userdata(generate.TypeControlPlane, input)
 		if err != nil {
 			return err

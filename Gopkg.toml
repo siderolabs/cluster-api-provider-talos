@@ -27,6 +27,10 @@ required = [
   name="sigs.k8s.io/cluster-api"
   version="0.1.7"
 
+[[constraint]]
+  name="github.com/talos-systems/talos"
+  version="0.2.0-alpha.7"
+
 # STANZAS BELOW ARE GENERATED AND MAY BE WRITTEN - DO NOT MODIFY BELOW THIS LINE.
 
 [[constraint]]
