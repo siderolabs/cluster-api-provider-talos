@@ -77,7 +77,7 @@ func (aws *AWS) Create(ctx context.Context, cluster *clusterv1.Cluster, machine 
 		if err != nil {
 			return err
 		}
-		if address.PublicIp == nil {
+		if address == nil {
 			return errors.New("IP not ready")
 		}
 		natIP = *address.PublicIp
