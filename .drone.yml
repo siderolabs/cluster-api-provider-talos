@@ -34,6 +34,7 @@ steps:
   - name: test
     image: autonomy/build-container:latest
     commands:
+      - sleep 5
       - make test
     volumes:
       - name: dockersock
