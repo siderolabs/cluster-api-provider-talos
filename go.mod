@@ -3,40 +3,32 @@ module github.com/talos-systems/cluster-api-provider-talos
 go 1.12
 
 require (
-	cloud.google.com/go v0.42.0 // indirect
 	github.com/Azure/azure-sdk-for-go v32.5.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.9.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.3.0
 	github.com/Azure/go-autorest/autorest/to v0.2.0
 	github.com/aws/aws-sdk-go v1.20.21
-	github.com/go-logr/zapr v0.1.1 // indirect
-	github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6 // indirect
-	github.com/googleapis/gnostic v0.3.0 // indirect
 	github.com/onsi/gomega v1.5.0
 	github.com/packethost/packngo v0.0.0-20190507131943-1343be729ca2
-	github.com/prometheus/common v0.6.0 // indirect
-	github.com/prometheus/procfs v0.0.3 // indirect
 	github.com/talos-systems/talos v0.2.0-alpha.7
 	golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7
 	google.golang.org/api v0.7.0
-	google.golang.org/grpc v1.22.0 // indirect
 	gopkg.in/yaml.v2 v2.2.2
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
-	k8s.io/client-go v10.0.0+incompatible
+	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
 	k8s.io/code-generator v0.0.0
-	k8s.io/kube-openapi v0.0.0-20190718094010-3cf2ea392886 // indirect
-	sigs.k8s.io/cluster-api v0.1.7
+	sigs.k8s.io/cluster-api v0.1.9
 	sigs.k8s.io/controller-runtime v0.1.12
 	sigs.k8s.io/controller-tools v0.1.11
-	sigs.k8s.io/testing_frameworks v0.1.1
+	sigs.k8s.io/testing_frameworks v0.1.2-0.20190130140139-57f07443c2d4
 )
 
 replace (
 	git.apache.org/thrift.git => github.com/apache/thrift v0.12.0
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v12.4.1+incompatible
 	k8s.io/api => k8s.io/api v0.0.0-20190222213804-5cb15d344471
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.0.0-20190228180357-d002e88f6236 // indirect
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.0.0-20190228180357-d002e88f6236
 	k8s.io/apimachinery => k8s.io/apimachinery v0.0.0-20190221213512-86fb29eff628
 	k8s.io/apiserver => k8s.io/apiserver v0.0.0-20190122042701-b6aa1175dafa
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.0.0-20190822063658-442a64f3fed7
@@ -58,5 +50,4 @@ replace (
 	k8s.io/metrics => k8s.io/metrics v0.0.0-20190822063337-6c03eb8600ee
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.0.0-20190822061642-ab22eab63834
 	k8s.io/utils => k8s.io/utils v0.0.0-20190801114015-581e00157fb1
-	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.1.10
 )
