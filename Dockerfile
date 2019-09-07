@@ -1,6 +1,6 @@
 ARG KUBEBUILDER_VERSION=1.0.8
 ARG KUSTOMIZE_VERSION=1.0.11
-ARG CAPI_VERSION=0.1.7
+ARG CAPI_VERSION=0.1.9
 
 FROM golang:1.13.0-alpine as base
 RUN apk add --no-cache make curl git
