@@ -32,8 +32,8 @@ deploy: manifests
 # Generate manifests e.g. CRD, RBAC etc.
 manifests:
 	docker build . --target $@ -t $(REPO):manifests --build-arg IMG="$(REPO):$(TAG)"
-	mkdir -p ./manifests
-	docker run $(REPO):manifests sh -c 'cat /tmp/manifests/provider-components.yaml' > ./manifests/provider-components.yaml
+	mkdir -p /tmp/manifests
+	docker run $(REPO):manifests sh -c 'cat /tmp/manifests/provider-components.yaml' > /tmp/manifests/provider-components.yaml
 
 # Build the docker image
 docker-build:
