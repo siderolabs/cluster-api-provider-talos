@@ -25,7 +25,7 @@ import (
 
 	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/provisioners"
 	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/utils"
-	"github.com/talos-systems/talos/pkg/userdata/v1/generate"
+	"github.com/talos-systems/talos/pkg/userdata/v1alpha1/generate"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
