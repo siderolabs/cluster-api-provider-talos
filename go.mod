@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go v1.20.21
 	github.com/onsi/gomega v1.5.0
 	github.com/packethost/packngo v0.0.0-20190507131943-1343be729ca2
-	github.com/talos-systems/talos v0.2.0-alpha.7.0.20190909170349-aed8c067307f
+	github.com/talos-systems/talos v0.3.0-alpha.0.0.20190925181307-607d68008c9b
 	golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7
 	google.golang.org/api v0.7.0
 	gopkg.in/yaml.v2 v2.2.2
