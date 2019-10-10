@@ -22,7 +22,8 @@ import (
 
 //TalosClusterControlPlaneSpec is the spec that defines info about cluster controlplane
 type TalosClusterControlPlaneSpec struct {
-	Count int `json:"count,omitempty"`
+	Count      int    `json:"count,omitempty"`
+	K8sVersion string `json:"k8sversion,omitempty"`
 }
 
 //TalosClusterPlatformSpec defines info about platform configs
