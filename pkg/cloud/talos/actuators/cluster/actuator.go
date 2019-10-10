@@ -18,14 +18,16 @@ package cluster
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"log"
-	"net"
 	"strconv"
 
 	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/provisioners"
 	"github.com/talos-systems/cluster-api-provider-talos/pkg/cloud/talos/utils"
-	"github.com/talos-systems/talos/pkg/userdata/v1alpha1/generate"
+	"github.com/talos-systems/talos/cmd/osctl/pkg/helpers"
+	"github.com/talos-systems/talos/pkg/config/types/v1alpha1/generate"
+	"gopkg.in/yaml.v2"
 	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,6 +52,18 @@ type ClusterActuator struct {
 
 // ClusterActuatorParams holds parameter information for Actuator
 type ClusterActuatorParams struct {
+}
+
+type talosConfig struct {
+	Context  string
+	Contexts map[string]*talosConfigContext
+}
+
+type talosConfigContext struct {
+	Target string
+	CA     string
+	Crt    string
+	Key    string
 }
 
 // NewClusterActuator creates a new Actuator
@@ -84,7 +98,7 @@ func (a *ClusterActuator) Reconcile(cluster *clusterv1.Cluster) error {
 	}
 
 	//Create machine config, using IPs allocated above
-	input, err := generate.NewInput(cluster.ObjectMeta.Name, masterIPs)
+	input, err := generate.NewInput(cluster.ObjectMeta.Name, masterIPs, spec.ControlPlane.K8sVersion)
 	if err != nil {
 		return err
 	}
@@ -142,13 +156,24 @@ func (a *ClusterActuator) Delete(cluster *clusterv1.Cluster) error {
 // createMasterConfigMaps generates certs and creates configmaps that define the userdata for each node
 func createMasterConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset, input *generate.Input) error {
 
-	talosconfig, err := generate.Talosconfig(input)
-	if err != nil {
-		return err
+	talosConfig := &talosConfig{
+		Context: input.ClusterName,
+		Contexts: map[string]*talosConfigContext{
+			input.ClusterName: {
+				Target: input.MasterIPs[0],
+				CA:     base64.StdEncoding.EncodeToString(input.Certs.OS.Crt),
+				Crt:    base64.StdEncoding.EncodeToString(input.Certs.Admin.Crt),
+				Key:    base64.StdEncoding.EncodeToString(input.Certs.Admin.Key),
+			},
+		},
 	}
 
-	input.IP = net.ParseIP(input.MasterIPs[0])
-	initData, err := generate.Userdata(generate.TypeInit, input)
+	talosConfigBytes, err := yaml.Marshal(talosConfig)
+	if err != nil {
+		helpers.Fatalf("failed to marshal config: %+v", err)
+	}
+
+	initData, err := generate.Config(generate.TypeInit, input)
 	if err != nil {
 		return err
 	}
@@ -156,10 +181,8 @@ func createMasterConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Cl
 	allData := []string{initData}
 
 	for i := 1; i < len(input.MasterIPs); i++ {
-		input.IP = net.ParseIP(input.MasterIPs[i])
-		input.Index = i
 
-		controlPlaneData, err := generate.Userdata(generate.TypeControlPlane, input)
+		controlPlaneData, err := generate.Config(generate.TypeControlPlane, input)
 		if err != nil {
 			return err
 		}
@@ -168,7 +191,7 @@ func createMasterConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Cl
 
 	for index, userdata := range allData {
 		name := cluster.ObjectMeta.Name + "-master-" + strconv.Itoa(index)
-		data := map[string]string{"userdata": userdata, "talosconfig": talosconfig}
+		data := map[string]string{"userdata": userdata, "talosconfig": string(talosConfigBytes)}
 
 		if err := createConfigMap(clientset, name, data); err != nil {
 			return err
@@ -180,7 +203,7 @@ func createMasterConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Cl
 
 // createWorkerConfigMaps creates a configmap for a machineset of workers
 func createWorkerConfigMaps(cluster *clusterv1.Cluster, clientset *kubernetes.Clientset, input *generate.Input) error {
-	workerData, err := generate.Userdata(generate.TypeJoin, input)
+	workerData, err := generate.Config(generate.TypeJoin, input)
 	if err != nil {
 		return err
 	}
